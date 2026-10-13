@@ -29,6 +29,16 @@ Pin a commit of this branch rather than the branch itself. The sibling crates
 (`libwebrtc`, `livekit-api`, `livekit-protocol` and the rest) then come from
 the same commit, so they always match.
 
+## On npm
+
+The `rift-npm` branch is `rift` plus the Node bindings renamed to
+`@joinrift/rtc-ffi-bindings` and its five platform packages, which
+`@joinrift/rtc-node` (Rift's fork of LiveKit's Node SDK) depends on. A push to
+the branch runs `.github/workflows/rift-npm.yml`, which builds each platform's
+binary and uploads the packed tarballs as the `npm-tarballs` artifact. It
+publishes nothing, so no npm token is kept here: the tarballs are published by
+hand, the platform packages before the main one.
+
 ## When it goes
 
 Each change goes when a LiveKit release has it, or an equivalent. Until then,

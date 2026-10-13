@@ -12,19 +12,19 @@ importers:
         specifier: ^1.10.1
         version: 1.10.1
     optionalDependencies:
-      '@livekit/rtc-ffi-bindings-darwin-arm64':
+      '@joinrift/rtc-ffi-bindings-darwin-arm64':
         specifier: workspace:*
         version: link:npm/darwin-arm64
-      '@livekit/rtc-ffi-bindings-darwin-x64':
+      '@joinrift/rtc-ffi-bindings-darwin-x64':
         specifier: workspace:*
         version: link:npm/darwin-x64
-      '@livekit/rtc-ffi-bindings-linux-arm64-gnu':
+      '@joinrift/rtc-ffi-bindings-linux-arm64-gnu':
         specifier: workspace:*
         version: link:npm/linux-arm64-gnu
-      '@livekit/rtc-ffi-bindings-linux-x64-gnu':
+      '@joinrift/rtc-ffi-bindings-linux-x64-gnu':
         specifier: workspace:*
         version: link:npm/linux-x64-gnu
-      '@livekit/rtc-ffi-bindings-win32-x64-msvc':
+      '@joinrift/rtc-ffi-bindings-win32-x64-msvc':
         specifier: workspace:*
         version: link:npm/win32-x64-msvc
     devDependencies:

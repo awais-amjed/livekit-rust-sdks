@@ -1,5 +1,5 @@
 {
-  "name": "@livekit/rtc-ffi-bindings-darwin-x64",
+  "name": "@joinrift/rtc-ffi-bindings-darwin-x64",
   "version": "0.12.83",
   "cpu": [
     "x64"
@@ -8,7 +8,7 @@
   "files": [
     "rtc-node.darwin-x64.node"
   ],
-  "description": "LiveKit RTC Node FFI bindings for internal use only",
+  "description": "LiveKit's RTC Node FFI bindings with stereo publishing, packaged for Rift (unofficial fork; internal to @joinrift/rtc-node)",
   "author": "LiveKit",
   "license": "Apache-2.0",
   "engines": {
@@ -16,7 +16,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/livekit/rust-sdks.git",
+    "url": "https://github.com/awais-amjed/livekit-rust-sdks.git",
     "directory": "livekit-ffi-node-bindings/npm/darwin-x64"
   },
   "os": [

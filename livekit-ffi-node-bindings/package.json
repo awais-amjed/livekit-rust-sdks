@@ -1,6 +1,6 @@
 {
-  "name": "@livekit/rtc-ffi-bindings",
-  "description": "LiveKit RTC Node FFI bindings for internal use only",
+  "name": "@joinrift/rtc-ffi-bindings",
+  "description": "LiveKit's RTC Node FFI bindings with stereo publishing, packaged for Rift (unofficial fork; internal to @joinrift/rtc-node)",
   "license": "Apache-2.0",
   "author": "LiveKit",
   "version": "0.12.83",
@@ -9,7 +9,7 @@
   "type": "commonjs",
   "repository": {
     "type": "git",
-    "url": "https://github.com/livekit/rust-sdks.git",
+    "url": "https://github.com/awais-amjed/livekit-rust-sdks.git",
     "directory": "livekit-ffi-node-bindings"
   },
   "files": [
@@ -43,11 +43,11 @@
     "typescript": "5.9.3"
   },
   "optionalDependencies": {
-    "@livekit/rtc-ffi-bindings-darwin-arm64": "workspace:*",
-    "@livekit/rtc-ffi-bindings-darwin-x64": "workspace:*",
-    "@livekit/rtc-ffi-bindings-linux-arm64-gnu": "workspace:*",
-    "@livekit/rtc-ffi-bindings-linux-x64-gnu": "workspace:*",
-    "@livekit/rtc-ffi-bindings-win32-x64-msvc": "workspace:*"
+    "@joinrift/rtc-ffi-bindings-darwin-arm64": "workspace:*",
+    "@joinrift/rtc-ffi-bindings-darwin-x64": "workspace:*",
+    "@joinrift/rtc-ffi-bindings-linux-arm64-gnu": "workspace:*",
+    "@joinrift/rtc-ffi-bindings-linux-x64-gnu": "workspace:*",
+    "@joinrift/rtc-ffi-bindings-win32-x64-msvc": "workspace:*"
   },
   "engines": {
     "node": ">= 18"
