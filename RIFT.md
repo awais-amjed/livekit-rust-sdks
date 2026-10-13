@@ -1,7 +1,7 @@
 # The `rift` branch
 
-LiveKit's Rust SDKs at the commit that released `livekit` 0.9.1 and
-`webrtc-sys` 0.3.45 (`2ff180e4`), with two changes [Rift](https://joinrift.app)
+LiveKit's Rust SDKs at the commit that released `livekit` 0.9.5 and
+`webrtc-sys` 0.3.49 (`49b3ebe9`), with one change [Rift](https://joinrift.app)
 needs. Everything else is upstream, unchanged.
 
 1. **`livekit`: a two-channel audio track is published in stereo.** The server
@@ -11,11 +11,11 @@ needs. Everything else is upstream, unchanged.
    [#1018](https://github.com/livekit/rust-sdks/issues/1018); the same change
    as PR [#1023](https://github.com/livekit/rust-sdks/pull/1023)). Measured
    Oct 12 2026: a tone in one ear came out in both before, in one after.
-2. **`webrtc-sys`: WebRTC trusts the pass-through encoder's rate control.**
-   Frames handed over already encoded were still subject to WebRTC's frame
-   dropper, and one dropped H264 delta frame froze the picture until the next
-   keyframe. Measured Oct 5 2026 on Windows: 4 to 7 frames dropped a run
-   before, none after.
+
+The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
+pass-through encoder's rate control. 0.3.49 does that itself and more
+([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was
+dropped. The earlier branch is kept as the tag `rift-livekit-0.9.1`.
 
 ## Using it
 
