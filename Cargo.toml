@@ -55,7 +55,7 @@ license = "Apache-2.0"
 device-info = { version = "0.1.1", path = "device-info" }
 imgproc = { version = "0.3.20", path = "imgproc" }
 libwebrtc = { version = "0.4.0", path = "libwebrtc" }
-livekit = { version = "0.10.1", path = "livekit" }
+livekit = { version = "0.10.1", path = "livekit", package = "joinrift-livekit" }
 livekit-api = { version = "0.10.1", path = "livekit-api" }
 livekit-capture = { version = "0.1.9", path = "livekit-capture" }
 livekit-ffi = { version = "0.13.4", path = "livekit-ffi" }
