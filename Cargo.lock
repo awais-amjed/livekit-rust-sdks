@@ -559,7 +559,7 @@ dependencies = [
  "anyhow",
  "env_logger 0.11.11",
  "futures-util",
- "livekit",
+ "joinrift-livekit",
  "log",
  "tokio",
 ]
@@ -571,7 +571,7 @@ dependencies = [
  "clap",
  "env_logger 0.11.11",
  "hound",
- "livekit",
+ "joinrift-livekit",
  "livekit-api",
  "log",
  "tokio",
@@ -583,7 +583,7 @@ version = "0.1.0"
 dependencies = [
  "env_logger 0.11.11",
  "futures-util",
- "livekit",
+ "joinrift-livekit",
  "log",
  "tokio",
 ]
@@ -1602,7 +1602,7 @@ dependencies = [
  "csv",
  "env_logger 0.11.11",
  "futures-util",
- "livekit",
+ "joinrift-livekit",
  "livekit-api",
  "log",
  "rand 0.9.5",
@@ -1901,7 +1901,7 @@ version = "0.1.0"
 dependencies = [
  "env_logger 0.11.11",
  "futures-util",
- "livekit",
+ "joinrift-livekit",
  "livekit-api",
  "log",
  "tokio",
@@ -3504,6 +3504,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "joinrift-livekit"
+version = "0.9.5"
+dependencies = [
+ "anyhow",
+ "bmrng",
+ "bytes",
+ "chrono",
+ "futures-util",
+ "http 1.4.2",
+ "lazy_static",
+ "libloading 0.8.9",
+ "libwebrtc",
+ "livekit-api",
+ "livekit-common",
+ "livekit-data-stream",
+ "livekit-datatrack",
+ "livekit-protocol",
+ "livekit-rpc",
+ "livekit-signaling",
+ "livekit-token",
+ "log",
+ "parking_lot",
+ "prost 0.14.4",
+ "rand 0.9.5",
+ "serde",
+ "serde_json",
+ "serial_test",
+ "test-case",
+ "test-log",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "js-sys"
 version = "0.3.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3758,41 +3793,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
 
 [[package]]
-name = "livekit"
-version = "0.9.5"
-dependencies = [
- "anyhow",
- "bmrng",
- "bytes",
- "chrono",
- "futures-util",
- "http 1.4.2",
- "lazy_static",
- "libloading 0.8.9",
- "libwebrtc",
- "livekit-api",
- "livekit-common",
- "livekit-data-stream",
- "livekit-datatrack",
- "livekit-protocol",
- "livekit-rpc",
- "livekit-signaling",
- "livekit-token",
- "log",
- "parking_lot",
- "prost 0.14.4",
- "rand 0.9.5",
- "serde",
- "serde_json",
- "serial_test",
- "test-case",
- "test-log",
- "thiserror 1.0.69",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
 name = "livekit-api"
 version = "0.9.0"
 dependencies = [
@@ -3828,7 +3828,7 @@ dependencies = [
  "chrono",
  "gstreamer",
  "gstreamer-app",
- "livekit",
+ "joinrift-livekit",
  "log",
  "pollster",
  "schemars",
@@ -3906,9 +3906,9 @@ dependencies = [
  "futures-util",
  "imgproc",
  "jni 0.21.1",
+ "joinrift-livekit",
  "lazy_static",
  "link-cplusplus",
- "livekit",
  "livekit-capture",
  "livekit-protocol",
  "livekit-token",
@@ -4074,7 +4074,7 @@ dependencies = [
  "cpal",
  "env_logger 0.11.11",
  "futures-util",
- "livekit",
+ "joinrift-livekit",
  "livekit-api",
  "log",
  "tokio",
@@ -4095,7 +4095,7 @@ dependencies = [
  "env_logger 0.11.11",
  "futures",
  "image",
- "livekit",
+ "joinrift-livekit",
  "livekit-api",
  "log",
  "metal 0.32.0",
@@ -4284,8 +4284,8 @@ dependencies = [
  "android_logger",
  "futures",
  "jni 0.21.1",
+ "joinrift-livekit",
  "lazy_static",
- "livekit",
  "log",
  "parking_lot",
  "tokio",
@@ -5526,7 +5526,7 @@ name = "play_from_disk"
 version = "0.1.0"
 dependencies = [
  "env_logger 0.11.11",
- "livekit",
+ "joinrift-livekit",
  "log",
  "thiserror 2.0.19",
  "tokio",
@@ -6343,7 +6343,7 @@ name = "rpc"
 version = "0.1.0"
 dependencies = [
  "env_logger 0.11.11",
- "livekit",
+ "joinrift-livekit",
  "livekit-api",
  "log",
  "rand 0.9.5",
@@ -6549,7 +6549,7 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "futures",
- "livekit",
+ "joinrift-livekit",
  "tokio",
 ]
 
@@ -6620,7 +6620,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "env_logger 0.11.11",
- "livekit",
+ "joinrift-livekit",
  "livekit-api",
  "log",
  "tokio",

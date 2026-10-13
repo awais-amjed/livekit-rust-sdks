@@ -29,6 +29,16 @@ Pin a commit of this branch rather than the branch itself. The sibling crates
 (`libwebrtc`, `livekit-api`, `livekit-protocol` and the rest) then come from
 the same commit, so they always match.
 
+## On crates.io
+
+The `rift-crates` branch is `rift` plus one commit that renames the `livekit`
+package to `joinrift-livekit` (the library is still `livekit`) and gives it its
+own README, so it can be published without passing for LiveKit's release. The
+crate's other LiveKit dependencies come from crates.io as LiveKit released them,
+since none of them is changed. `rift` itself keeps the name `livekit`, which
+`[patch.crates-io]` needs. Publish from `rift-crates`, after rebasing it onto
+`rift`.
+
 ## When it goes
 
 Each change goes when a LiveKit release has it, or an equivalent. Until then,

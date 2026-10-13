@@ -1,11 +1,17 @@
 [package]
-name = "livekit"
+# RIFT PATCH: published under another name, since it is not LiveKit's own
+# release. The library keeps the name `livekit`, so code using it is unchanged.
+name = "joinrift-livekit"
 version = "0.9.5"
 edition.workspace = true
 license.workspace = true
-description = "Rust Client SDK for LiveKit"
-repository.workspace = true
-readme = "README.md"
+description = "LiveKit's Rust client SDK 0.9.5 with stereo publishing, packaged for Rift (unofficial fork)"
+repository = "https://github.com/awais-amjed/livekit-rust-sdks"
+homepage = "https://joinrift.app"
+readme = "CRATE_README.md"
+
+[lib]
+name = "livekit"
 
 [features]
 # By default ws TLS is not enabled
