@@ -34,4 +34,6 @@ the same commit, so they always match.
 Each change goes when a LiveKit release has it, or an equivalent. Until then,
 moving to a newer release means rebasing this branch onto its release commit.
 
-The SDKs are LiveKit's, under the Apache-2.0 licence in `LICENSE`.
+The SDKs are LiveKit's, under the Apache-2.0 licence in `LICENSE`. This is
+Rift's fork, not an official LiveKit release, and LiveKit has not reviewed or
+endorsed it. Each changed file marks what changed with `RIFT PATCH`.
