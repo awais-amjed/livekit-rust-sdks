@@ -41,6 +41,8 @@ class DesktopCapturer : public webrtc::DesktopCapturer::Callback {
 
   rust::Vec<Source> get_source_list() const;
   bool select_source(uint64_t id) const { return capturer->SelectSource(id); }
+  // RIFT PATCH: start from a choice the desktop's portal already saved.
+  bool select_restore_token(rust::Str token) const;
   void start(rust::Box<DesktopCapturerCallbackWrapper> callback);
   void capture_frame() const { capturer->CaptureFrame(); }
 

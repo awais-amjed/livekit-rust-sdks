@@ -129,6 +129,20 @@ impl DesktopCapturer {
         self.handle.start(inner_callback);
     }
 
+    /// RIFT PATCH: start from a choice the desktop's ScreenCast portal saved,
+    /// rather than showing its picker. `token` is the `restore_token` a
+    /// portal session answered with, asked for with a `persist_mode` that
+    /// keeps it; call this before [`start_capture`](Self::start_capture), with
+    /// no source. Only the PipeWire capturer under Wayland takes one; false
+    /// everywhere else, and the capture then asks as it always does.
+    ///
+    /// Lets an app run the picker itself and learn what the desktop saved
+    /// about the choice (GNOME keeps the window's app id and title), which
+    /// libwebrtc's own portal session never says.
+    pub fn select_restore_token(&mut self, token: &str) -> bool {
+        self.handle.select_restore_token(token)
+    }
+
     /// Captures a single frame.
     ///
     /// You must call [`start_capture`](Self::start_capture) before calling this method.

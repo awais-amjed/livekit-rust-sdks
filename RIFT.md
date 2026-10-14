@@ -1,7 +1,7 @@
 # The `rift` branch
 
 LiveKit's Rust SDKs at the commit that released `livekit` 0.9.5 and
-`webrtc-sys` 0.3.49 (`49b3ebe9`), with one change [Rift](https://joinrift.app)
+`webrtc-sys` 0.3.49 (`49b3ebe9`), with the changes [Rift](https://joinrift.app)
 needs. Everything else is upstream, unchanged.
 
 1. **`livekit`: a two-channel audio track is published in stereo.** The server
@@ -11,6 +11,16 @@ needs. Everything else is upstream, unchanged.
    [#1018](https://github.com/livekit/rust-sdks/issues/1018); the same change
    as PR [#1023](https://github.com/livekit/rust-sdks/pull/1023)). Measured
    Oct 12 2026: a tone in one ear came out in both before, in one after.
+
+2. **`libwebrtc`: a desktop capture can start from a choice the ScreenCast
+   portal saved** (`DesktopCapturer::select_restore_token`). Under Wayland
+   libwebrtc runs the portal's picker itself, and the portal tells an app
+   nothing about the window picked. Rift runs the picker first, keeping the
+   pick, to read which app's window it was (GNOME saves the app id and title
+   with it), then hands libwebrtc the pick's restore token, which it already
+   knows how to use: `RestoreTokenManager`, the prebuilt library's own. No
+   second picker. Verified Oct 14 2026 on GNOME 50: the window shared 0.07 s
+   after the one pick.
 
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more

@@ -133,6 +133,11 @@ impl DesktopCapturer {
         self.sys_handle.select_source(id)
     }
 
+    // RIFT PATCH: see DesktopCapturer::select_restore_token.
+    pub(crate) fn select_restore_token(&self, token: &str) -> bool {
+        self.sys_handle.select_restore_token(token)
+    }
+
     pub(crate) fn get_source_list(&self) -> Vec<CaptureSource> {
         let mut sources = Vec::new();
         let source_list = self.sys_handle.get_source_list();

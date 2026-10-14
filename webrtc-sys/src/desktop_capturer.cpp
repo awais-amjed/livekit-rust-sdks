@@ -17,6 +17,10 @@
 #include "livekit/desktop_capturer.h"
 
 #include "modules/desktop_capture/desktop_capture_options.h"
+#ifdef WEBRTC_USE_PIPEWIRE
+// RIFT PATCH: for select_restore_token.
+#include "modules/desktop_capture/linux/wayland/restore_token_manager.h"
+#endif /* WEBRTC_USE_PIPEWIRE */
 
 using SourceList = webrtc::DesktopCapturer::SourceList;
 
@@ -101,6 +105,26 @@ void DesktopCapturer::OnCaptureResult(
     (*callback)->on_capture_result(
         ret_result, std::make_unique<DesktopFrame>(std::move(frame)));
   }
+}
+
+// RIFT PATCH: the PipeWire capturer opens the portal with the restore token
+// saved under its selected source, so the desktop shows no picker and shares
+// what the token names. An app that ran the portal itself (to learn which
+// window was picked) hands the choice over this way. A fresh id, since the
+// manager never replaces a token it holds. Where the capturer is not the
+// portal's (X11, Windows, macOS) there is no token to use.
+bool DesktopCapturer::select_restore_token(rust::Str token) const {
+#ifdef WEBRTC_USE_PIPEWIRE
+  if (!webrtc::DesktopCapturer::IsRunningUnderWayland()) {
+    return false;
+  }
+  auto& tokens = webrtc::RestoreTokenManager::GetInstance();
+  const webrtc::DesktopCapturer::SourceId id = tokens.GetUnusedId();
+  tokens.AddToken(id, std::string(token));
+  return capturer->SelectSource(id);
+#else
+  return false;
+#endif /* WEBRTC_USE_PIPEWIRE */
 }
 
 rust::Vec<Source> DesktopCapturer::get_source_list() const {
