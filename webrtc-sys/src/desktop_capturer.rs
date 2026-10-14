@@ -56,6 +56,8 @@ pub mod ffi {
         fn capture_frame(self: &DesktopCapturer);
         fn get_source_list(self: &DesktopCapturer) -> Vec<Source>;
         fn select_source(self: &DesktopCapturer, id: u64) -> bool;
+        // RIFT PATCH: see select_restore_token in desktop_capturer.cpp.
+        fn select_restore_token(self: &DesktopCapturer, token: &str) -> bool;
         fn start(self: Pin<&mut DesktopCapturer>, callback: Box<DesktopCapturerCallbackWrapper>);
 
         fn width(self: &DesktopFrame) -> i32;
