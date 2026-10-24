@@ -38,6 +38,8 @@ pub mod ffi {
         source_type: SourceType,
         include_cursor: bool,
         allow_sck_system_picker: bool,
+        // RIFT PATCH: see new_desktop_capturer in desktop_capturer.cpp.
+        allow_wgc_screen_capturer: bool,
     }
 
     enum CaptureResult {

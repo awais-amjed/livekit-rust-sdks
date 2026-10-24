@@ -17,6 +17,10 @@
 #include "livekit/desktop_capturer.h"
 
 #include "modules/desktop_capture/desktop_capture_options.h"
+#ifdef _WIN64
+// RIFT PATCH: for a screen captured without Windows Graphics Capture.
+#include "modules/desktop_capture/desktop_and_cursor_composer.h"
+#endif /* _WIN64 */
 #ifdef WEBRTC_USE_PIPEWIRE
 // RIFT PATCH: for select_restore_token.
 #include "modules/desktop_capture/linux/wayland/restore_token_manager.h"
@@ -37,7 +41,11 @@ std::unique_ptr<DesktopCapturer> new_desktop_capturer(
 #ifdef _WIN64
   switch (options.source_type) {
     case SourceType::Screen:
-      webrtc_options.set_allow_wgc_screen_capturer(true);
+      // RIFT PATCH: Windows Graphics Capture draws a yellow border round the
+      // screen, which only Windows 11 lets an app turn off. Without it a
+      // screen is captured with DXGI desktop duplication, falling back to GDI.
+      webrtc_options.set_allow_wgc_screen_capturer(
+          options.allow_wgc_screen_capturer);
       break;
     case SourceType::Window:
       webrtc_options.set_allow_wgc_window_capturer(true);
@@ -64,6 +72,16 @@ std::unique_ptr<DesktopCapturer> new_desktop_capturer(
       break;
     case SourceType::Screen:
       capturer = webrtc::DesktopCapturer::CreateScreenCapturer(webrtc_options);
+#ifdef _WIN64
+      // RIFT PATCH: only Windows Graphics Capture puts the cursor in its
+      // frames (prefer_cursor_embedded); DXGI and GDI leave it out, so it
+      // is drawn in.
+      if (capturer && options.include_cursor &&
+          !options.allow_wgc_screen_capturer) {
+        capturer = std::make_unique<webrtc::DesktopAndCursorComposer>(
+            std::move(capturer), webrtc_options);
+      }
+#endif /* _WIN64 */
       break;
     case SourceType::Generic:
       capturer = webrtc::DesktopCapturer::CreateGenericCapturer(webrtc_options);

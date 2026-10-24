@@ -76,6 +76,20 @@ impl DesktopCapturerOptions {
     pub fn set_sck_system_picker(&mut self, allow_sck_system_picker: bool) {
         self.sys_handle = self.sys_handle.with_sck_system_picker(allow_sck_system_picker);
     }
+
+    /// RIFT PATCH: sets whether a screen is captured with Windows Graphics
+    /// Capture. This is enabled by default.
+    ///
+    /// Windows draws a yellow border round a screen captured that way, and
+    /// only Windows 11 lets an app turn it off. When disabled, a screen is
+    /// captured with DXGI desktop duplication (GDI where that fails), which
+    /// draws none, and the cursor is drawn into its frames when
+    /// [`set_include_cursor`](Self::set_include_cursor) asks for it. Source
+    /// ids differ between the two, so list and capture with the same setting.
+    #[cfg(target_os = "windows")]
+    pub fn set_wgc_screen_capturer(&mut self, allow: bool) {
+        self.sys_handle = self.sys_handle.with_wgc_screen_capturer(allow);
+    }
 }
 
 /// A desktop capturer for capturing screens or windows.
