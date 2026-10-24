@@ -22,6 +22,15 @@ needs. Everything else is upstream, unchanged.
    second picker. Verified Oct 14 2026 on GNOME 50: the window shared 0.07 s
    after the one pick.
 
+3. **`libwebrtc`: a Windows screen can be captured without Windows Graphics
+   Capture** (`DesktopCapturerOptions::set_wgc_screen_capturer`). Windows
+   draws a yellow border round a screen captured that way, and only Windows
+   11 lets an app turn it off, which libwebrtc does. Turned off, a screen is
+   captured with DXGI desktop duplication (GDI where that fails), which draws
+   none, and `webrtc-sys` puts the cursor into its frames with
+   `DesktopAndCursorComposer`, since only Windows Graphics Capture draws it
+   itself. Rift turns it off where Windows cannot hide the border.
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was

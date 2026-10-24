@@ -29,6 +29,9 @@ pub(crate) struct DesktopCapturerOptions {
     include_cursor: bool,
     #[cfg(target_os = "macos")]
     allow_sck_system_picker: bool,
+    // RIFT PATCH: see DesktopCapturerOptions::set_wgc_screen_capturer.
+    #[cfg(target_os = "windows")]
+    allow_wgc_screen_capturer: bool,
 }
 
 impl Default for DesktopCapturerOptions {
@@ -38,6 +41,8 @@ impl Default for DesktopCapturerOptions {
             include_cursor: false,
             #[cfg(target_os = "macos")]
             allow_sck_system_picker: true,
+            #[cfg(target_os = "windows")]
+            allow_wgc_screen_capturer: true,
         }
     }
 }
@@ -58,6 +63,12 @@ impl DesktopCapturerOptions {
         self
     }
 
+    #[cfg(target_os = "windows")]
+    pub(crate) fn with_wgc_screen_capturer(mut self, allow: bool) -> Self {
+        self.allow_wgc_screen_capturer = allow;
+        self
+    }
+
     pub(crate) fn to_sys_handle(&self) -> sys_dc::ffi::DesktopCapturerOptions {
         let source_type = match self.source_type {
             SourceType::Screen => sys_dc::ffi::SourceType::Screen,
@@ -74,6 +85,16 @@ impl DesktopCapturerOptions {
                     self.allow_sck_system_picker
                 }
                 #[cfg(not(target_os = "macos"))]
+                {
+                    false
+                }
+            },
+            allow_wgc_screen_capturer: {
+                #[cfg(target_os = "windows")]
+                {
+                    self.allow_wgc_screen_capturer
+                }
+                #[cfg(not(target_os = "windows"))]
                 {
                     false
                 }
