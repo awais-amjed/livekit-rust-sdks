@@ -110,6 +110,15 @@ std::vector<webrtc::SdpVideoFormat> VideoDecoderFactory::GetSupportedFormats()
          webrtc::SupportedH264DecoderCodecs()) {
       formats.push_back(h264_format);
     }
+    // RIFT PATCH: High too, which the FFmpeg decoder plays (Create takes any
+    // H264). The server settles a connection's codecs from its first video
+    // section, here a receiving one: without High there, a High track
+    // published on the same connection later is answered with constrained
+    // baseline's payload type, which libwebrtc refuses as a collision.
+    formats.push_back(webrtc::SdpVideoFormat(
+        webrtc::kH264CodecName, {{"profile-level-id", "640032"},
+                                 {"level-asymmetry-allowed", "1"},
+                                 {"packetization-mode", "1"}}));
   }
 
   formats.push_back(webrtc::SdpVideoFormat(

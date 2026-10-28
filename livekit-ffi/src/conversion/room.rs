@@ -370,6 +370,7 @@ impl From<proto::TrackPublishOptions> for TrackPublishOptions {
                 .unwrap_or(default_publish_options.video_encoder),
             scalability_mode: opts.scalability_mode,
             degradation_preference: degradation_preference_from_proto(opts.degradation_preference),
+            h264_high: default_publish_options.h264_high,
         }
     }
 }

@@ -424,6 +424,11 @@ PassthroughVideoEncoderFactory::PassthroughVideoEncoderFactory() {
   supported_formats_.push_back(
       SdpVideoFormat(SdpVideoFormat::AV1Profile0(), scalability_modes));
   supported_formats_.push_back(SdpVideoFormat("H264", h264_parameters));
+  // RIFT PATCH: High as well, for an encoder that makes it. The server
+  // registers High as 640032 and matches H264 on profile alone, so the level
+  // here is the server's; TrackPublishOptions::h264_high puts it first.
+  h264_parameters["profile-level-id"] = "640032";
+  supported_formats_.push_back(SdpVideoFormat("H264", h264_parameters));
   supported_formats_.push_back(SdpVideoFormat("H265"));
   supported_formats_.push_back(SdpVideoFormat("HEVC"));
 }

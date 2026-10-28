@@ -436,6 +436,27 @@ VideoEncoderFactory::InternalFactory::GetImplementations() const {
     formats.push_back(WithBackend(format, VideoEncoderBackend::Software));
   }
 
+  // RIFT PATCH: the pass-through's own formats too, so one that no real
+  // encoder lists (H264 High) can be sent: WebRTC sends only a negotiated
+  // codec it finds among these ("No video codecs in common"). The same
+  // filter as GetSupportedFormats: only a codec some real encoder has.
+  const size_t real_format_count = formats.size();
+  for (const auto& backend_factory : factories_) {
+    if (backend_factory.backend != VideoEncoderBackend::PreEncoded) {
+      continue;
+    }
+    for (const auto& format : backend_factory.factory->GetImplementations()) {
+      const bool codec_available = std::any_of(
+          formats.begin(), formats.begin() + real_format_count,
+          [&](const webrtc::SdpVideoFormat& existing) {
+            return IsSameCodecName(existing.name, format.name);
+          });
+      if (codec_available) {
+        formats.push_back(WithBackend(format, backend_factory.backend));
+      }
+    }
+  }
+
   return formats;
 }
 
