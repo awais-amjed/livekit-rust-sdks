@@ -514,6 +514,11 @@ VideoEncoderFactory::InternalFactory::GetImplementations() const {
           });
       if (!codec_implemented) {
         formats.push_back(format);
+      } else {
+        // RIFT PATCH: and for a codec a real encoder has, the pass-through's
+        // own formats too, so one no real encoder lists (H264 High) can be
+        // sent: WebRTC sends only a negotiated codec it finds among these.
+        formats.push_back(WithBackend(format, backend_factory.backend));
       }
     }
   }

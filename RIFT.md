@@ -31,6 +31,25 @@ needs. Everything else is upstream, unchanged.
    `DesktopAndCursorComposer`, since only Windows Graphics Capture draws it
    itself. Rift turns it off where Windows cannot hide the border.
 
+4. **`webrtc-sys` and `livekit`: a pre-encoded H264 track can be sent in
+   High profile.** The pass-through encoder offered only constrained baseline
+   (`42e01f`). Three changes, each needed (verified Oct 28 2026 against
+   livekit-server 1.13.7, NVENC and VAAPI, encrypted and not):
+   - The pass-through offers High as `640032`, the server's own; the server
+     matches H264 on profile, not level. `TrackPublishOptions::h264_high`
+     makes it the only H264 the transceiver offers: the server answers in its
+     own order, constrained baseline first, so offered beside it High was
+     never chosen. A server without High refuses such a track. Without the
+     option nothing changes.
+   - The decoder factory lists High too; its FFmpeg decoder plays it. The
+     server settles a connection's codecs from its first video section, a
+     receiving one the SDK adds up front, so without High there a High track
+     published later was answered with constrained baseline's payload type.
+   - The encoder factory's implementations list the pass-through's formats.
+     WebRTC sends only a negotiated codec it finds there; baseline was there
+     through the software encoder and High was not ("No video codecs in
+     common", nothing sent).
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was

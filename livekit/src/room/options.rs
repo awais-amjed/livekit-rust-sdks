@@ -164,6 +164,11 @@ pub struct TrackPublishOptions {
     /// - Screen share: `MaintainResolution` (clarity is critical for text/UI)
     /// - Other/unknown: `Balanced`
     pub degradation_preference: Option<DegradationPreference>,
+    /// RIFT PATCH: offer H264 in High profile and no other, for a
+    /// pre-encoded track whose encoder makes High. The server picks
+    /// constrained baseline whenever it is offered, so it is not; a server
+    /// without High then refuses the track.
+    pub h264_high: bool,
 }
 
 impl Default for TrackPublishOptions {
@@ -183,6 +188,7 @@ impl Default for TrackPublishOptions {
             video_encoder: VideoEncoderBackend::Auto,
             scalability_mode: None,
             degradation_preference: None,
+            h264_high: false,
         }
     }
 }

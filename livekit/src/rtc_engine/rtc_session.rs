@@ -2081,6 +2081,7 @@ impl SessionInner {
             };
             let requested_mime_type = format!("video/{}", options.video_codec.as_str());
 
+            let mut high = Vec::new();
             let mut matched = Vec::new();
             let mut partial_matched = Vec::new();
             let mut producible_codecs = Vec::new();
@@ -2088,6 +2089,19 @@ impl SessionInner {
             for codec in pc_factory.get_rtp_sender_capabilities(MediaType::Video).codecs {
                 let mime_type = codec.mime_type.to_lowercase();
                 if mime_type == requested_mime_type {
+                    // RIFT PATCH: High alone when asked for (h264_high). The
+                    // server answers in its own order, constrained baseline
+                    // ahead of High, so any other H264 offered would win.
+                    if options.h264_high && mime_type == "video/h264" {
+                        if codec
+                            .sdp_fmtp_line
+                            .as_ref()
+                            .is_some_and(|fmtp| fmtp.contains("profile-level-id=6400"))
+                        {
+                            high.push(codec);
+                        }
+                        continue;
+                    }
                     if let Some(sdp_fmtp_line) = codec.sdp_fmtp_line.as_ref() {
                         // for h264 codecs that have sdpFmtpLine available, use only if the
                         // profile-level-id is 42e01f for cross-browser compatibility
@@ -2103,14 +2117,15 @@ impl SessionInner {
             }
 
             matched.append(&mut partial_matched);
-            if matched.is_empty() {
+            high.append(&mut matched);
+            if high.is_empty() {
                 log::warn!(
                     "no sender capability for {requested_mime_type}; offering the codecs this sender can produce"
                 );
-                matched = producible_codecs;
+                high = producible_codecs;
             }
 
-            transceiver.set_codec_preferences(matched)?;
+            transceiver.set_codec_preferences(high)?;
         }
 
         Ok(transceiver)
