@@ -50,6 +50,20 @@ needs. Everything else is upstream, unchanged.
      through the software encoder and High was not ("No video codecs in
      common", nothing sent).
 
+5. **Pass-through decoding, taken from upstream before it is merged.** PR
+   [#1515](https://github.com/livekit/rust-sdks/pull/1515) (open upstream,
+   its ten commits as they were on Oct 27 2026, unchanged): a factory made
+   with `VideoDecoderBackend::PassThrough` decodes nothing, and a remote video
+   track's frames are read still encoded, already decrypted, through
+   `NativeEncodedVideoStream`. Rift decodes them itself on the GPU. On top of
+   it, one change of our own: the shared runtime every `Room` uses can be made
+   that way (`livekit::webrtc::set_video_decoder_backend`, before the first
+   room, the way `enable_zero_playout_delay` is chosen), keeping its WARP
+   options. A runtime is one factory with its own threads, so a second
+   factory for one room would mix objects made on two sets of threads.
+   Rift's process holds two kinds of room on it: its share connections,
+   which only send, and the one it watches shares on.
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was

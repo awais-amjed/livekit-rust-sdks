@@ -34,6 +34,24 @@ pub mod webrtc {
     pub fn enable_zero_playout_delay() -> Result<(), WebRtcRuntimeInitializedError> {
         crate::rtc_engine::lk_runtime::LkRuntime::enable_zero_playout_delay()
     }
+
+    /// RIFT PATCH: chooses how the shared WebRTC runtime handles received
+    /// video. With
+    /// [`VideoDecoderBackend::PassThrough`](libwebrtc::peer_connection_factory::VideoDecoderBackend::PassThrough)
+    /// nothing is decoded: a remote video track's frames are read still
+    /// encoded, through
+    /// [`NativeEncodedVideoStream`](libwebrtc::video_stream::native::NativeEncodedVideoStream).
+    /// It applies to every connection in the process.
+    ///
+    /// Call this before [`crate::Room::connect`]. While a runtime with another
+    /// choice is alive (a room, a track or a source still holds it) it returns
+    /// [`WebRtcRuntimeInitializedError`] and changes nothing.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn set_video_decoder_backend(
+        backend: libwebrtc::peer_connection_factory::VideoDecoderBackend,
+    ) -> Result<(), WebRtcRuntimeInitializedError> {
+        crate::rtc_engine::lk_runtime::LkRuntime::set_video_decoder_backend(backend)
+    }
 }
 
 pub use room::*;

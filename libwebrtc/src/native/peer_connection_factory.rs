@@ -91,6 +91,23 @@ impl PeerConnectionFactory {
         Self { sys_handle }
     }
 
+    /// RIFT PATCH: [`Self::with_options`] whose received video is handled by
+    /// `backend`.
+    pub fn with_options_and_video_decoder_backend(
+        zero_playout_delay: bool,
+        enable_warp: bool,
+        backend: crate::peer_connection_factory::VideoDecoderBackend,
+    ) -> Self {
+        ensure_log_sink();
+        let sys_handle =
+            sys_pcf::ffi::create_peer_connection_factory_with_options_and_video_decoder_backend(
+                zero_playout_delay,
+                enable_warp,
+                backend.into(),
+            );
+        Self { sys_handle }
+    }
+
     #[cfg(test)]
     pub(crate) fn zero_playout_delay_enabled(&self) -> bool {
         self.sys_handle.zero_playout_delay_enabled()

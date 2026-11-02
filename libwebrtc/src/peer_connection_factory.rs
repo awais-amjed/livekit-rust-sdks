@@ -133,6 +133,23 @@ impl PeerConnectionFactory {
         Self { handle: imp_pcf::PeerConnectionFactory::with_video_decoder_backend(backend) }
     }
 
+    /// RIFT PATCH: [`Self::with_options`] whose received video is handled by
+    /// `backend`.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn with_options_and_video_decoder_backend(
+        zero_playout_delay: bool,
+        enable_warp: bool,
+        backend: VideoDecoderBackend,
+    ) -> Self {
+        Self {
+            handle: imp_pcf::PeerConnectionFactory::with_options_and_video_decoder_backend(
+                zero_playout_delay,
+                enable_warp,
+                backend,
+            ),
+        }
+    }
+
     pub fn create_peer_connection(
         &self,
         config: RtcConfiguration,
