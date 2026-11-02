@@ -346,4 +346,14 @@ create_peer_connection_factory_with_options(bool zero_playout_delay,
                                                  enable_warp);
 }
 
+// RIFT PATCH: see the header.
+std::shared_ptr<PeerConnectionFactory>
+create_peer_connection_factory_with_options_and_video_decoder_backend(
+    bool zero_playout_delay,
+    bool enable_warp,
+    VideoDecoderBackend backend) {
+  return std::make_shared<PeerConnectionFactory>(
+      RtcRuntime::create(), zero_playout_delay, enable_warp, backend);
+}
+
 }  // namespace livekit_ffi

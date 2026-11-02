@@ -99,6 +99,12 @@ pub mod ffi {
             zero_playout_delay: bool,
             enable_warp: bool,
         ) -> SharedPtr<PeerConnectionFactory>;
+        // RIFT PATCH: the runtime's options and a decoder backend together.
+        fn create_peer_connection_factory_with_options_and_video_decoder_backend(
+            zero_playout_delay: bool,
+            enable_warp: bool,
+            backend: VideoDecoderBackend,
+        ) -> SharedPtr<PeerConnectionFactory>;
 
         fn zero_playout_delay_enabled(self: &PeerConnectionFactory) -> bool;
 

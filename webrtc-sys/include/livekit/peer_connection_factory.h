@@ -113,4 +113,11 @@ create_peer_connection_factory_with_options(bool zero_playout_delay,
 std::shared_ptr<PeerConnectionFactory>
 create_peer_connection_factory_with_video_decoder_backend(
     VideoDecoderBackend backend);
+// RIFT PATCH: the runtime's options and a decoder backend together, so the
+// shared runtime can decode in pass-through without losing WARP.
+std::shared_ptr<PeerConnectionFactory>
+create_peer_connection_factory_with_options_and_video_decoder_backend(
+    bool zero_playout_delay,
+    bool enable_warp,
+    VideoDecoderBackend backend);
 }  // namespace livekit_ffi

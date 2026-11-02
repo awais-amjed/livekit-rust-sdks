@@ -33,6 +33,9 @@ lazy_static! {
 struct LkRuntimeState {
     runtime: Weak<LkRuntime>,
     zero_playout_delay: bool,
+    // RIFT PATCH: how the next runtime handles received video.
+    #[cfg(not(target_arch = "wasm32"))]
+    video_decoder_backend: libwebrtc::peer_connection_factory::VideoDecoderBackend,
 }
 
 impl LkRuntimeState {
@@ -47,6 +50,20 @@ impl LkRuntimeState {
         self.zero_playout_delay = true;
         Ok(())
     }
+
+    // RIFT PATCH: see `LkRuntime::set_video_decoder_backend`.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn choose_video_decoder_backend(
+        &mut self,
+        active: Option<libwebrtc::peer_connection_factory::VideoDecoderBackend>,
+        backend: libwebrtc::peer_connection_factory::VideoDecoderBackend,
+    ) -> Result<(), WebRtcRuntimeInitializedError> {
+        if active.is_some_and(|active| active != backend) {
+            return Err(WebRtcRuntimeInitializedError);
+        }
+        self.video_decoder_backend = backend;
+        Ok(())
+    }
 }
 
 /// Returned when zero playout delay is requested after the default WebRTC runtime is active.
@@ -57,6 +74,9 @@ pub struct WebRtcRuntimeInitializedError;
 pub struct LkRuntime {
     pc_factory: PeerConnectionFactory,
     zero_playout_delay: bool,
+    // RIFT PATCH: see `set_video_decoder_backend`.
+    #[cfg(not(target_arch = "wasm32"))]
+    video_decoder_backend: libwebrtc::peer_connection_factory::VideoDecoderBackend,
 }
 
 impl Debug for LkRuntime {
@@ -73,6 +93,18 @@ impl LkRuntime {
         state.enable_zero_playout_delay(active_runtime_zero_playout_delay)
     }
 
+    /// RIFT PATCH: chooses how received video is handled by the runtime made
+    /// next. Refused while a runtime with another choice is alive: its
+    /// factory, and every connection made from it, keep theirs.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn set_video_decoder_backend(
+        backend: libwebrtc::peer_connection_factory::VideoDecoderBackend,
+    ) -> Result<(), WebRtcRuntimeInitializedError> {
+        let mut state = LK_RUNTIME.lock();
+        let active = state.runtime.upgrade().map(|runtime| runtime.video_decoder_backend);
+        state.choose_video_decoder_backend(active, backend)
+    }
+
     pub fn instance() -> Arc<LkRuntime> {
         let mut state = LK_RUNTIME.lock();
         if let Some(lk_runtime) = state.runtime.upgrade() {
@@ -85,11 +117,23 @@ impl LkRuntime {
             // in RtcSession). zero_playout_delay is independent and composed
             // alongside WARP. Whether WARP actually engages is negotiated with
             // the server — it degrades to plain DTLS/SCTP if the peer opts out.
+            // RIFT PATCH: with the decoder backend chosen, if any.
             #[cfg(not(target_arch = "wasm32"))]
-            let pc_factory = PeerConnectionFactory::with_options(zero_playout_delay, true);
+            let video_decoder_backend = state.video_decoder_backend;
+            #[cfg(not(target_arch = "wasm32"))]
+            let pc_factory = PeerConnectionFactory::with_options_and_video_decoder_backend(
+                zero_playout_delay,
+                true,
+                video_decoder_backend,
+            );
             #[cfg(target_arch = "wasm32")]
             let pc_factory = PeerConnectionFactory::default();
-            let new_runtime = Arc::new(Self { pc_factory, zero_playout_delay });
+            let new_runtime = Arc::new(Self {
+                pc_factory,
+                zero_playout_delay,
+                #[cfg(not(target_arch = "wasm32"))]
+                video_decoder_backend,
+            });
             state.runtime = Arc::downgrade(&new_runtime);
             new_runtime
         }
@@ -343,6 +387,27 @@ mod tests {
             Err(WebRtcRuntimeInitializedError)
         );
         assert!(!state.zero_playout_delay);
+    }
+
+    // RIFT PATCH: the decoder backend is chosen before a runtime, or as the
+    // one alive already has it, and never changed under it.
+    #[test]
+    fn video_decoder_backend_is_chosen_only_while_no_runtime_disagrees() {
+        use libwebrtc::peer_connection_factory::VideoDecoderBackend::{Auto, PassThrough};
+        let mut state = LkRuntimeState::default();
+        assert_eq!(state.video_decoder_backend, Auto);
+
+        assert_eq!(state.choose_video_decoder_backend(None, PassThrough), Ok(()));
+        assert_eq!(state.video_decoder_backend, PassThrough);
+        assert_eq!(state.choose_video_decoder_backend(Some(PassThrough), PassThrough), Ok(()));
+
+        assert_eq!(
+            state.choose_video_decoder_backend(Some(PassThrough), Auto),
+            Err(WebRtcRuntimeInitializedError)
+        );
+        assert_eq!(state.video_decoder_backend, PassThrough);
+        assert_eq!(state.choose_video_decoder_backend(None, Auto), Ok(()));
+        assert_eq!(state.video_decoder_backend, Auto);
     }
 }
 
