@@ -62,7 +62,15 @@ needs. Everything else is upstream, unchanged.
    options. A runtime is one factory with its own threads, so a second
    factory for one room would mix objects made on two sets of threads.
    Rift's process holds two kinds of room on it: its share connections,
-   which only send, and the one it watches shares on.
+   which only send, and the one it watches shares on. And one fix to the PR:
+   a pass-through factory turns pre-render smoothing off when it makes a
+   connection, and libwebrtc refuses any later change to it, so the
+   configuration LiveKit's Room sets again on joining was refused
+   ("Modifying the configuration in an unsupported way") and no room
+   joined. `set_configuration` now keeps the connection's smoothing when the
+   configuration leaves it at its default. Verified Nov 2 2026 against
+   livekit-server: encrypted VP8, VP9 and H264 shares read still encoded and
+   decoded by Rift on an Intel GPU, none lost.
 
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more

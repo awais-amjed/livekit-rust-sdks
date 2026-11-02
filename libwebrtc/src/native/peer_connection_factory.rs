@@ -465,6 +465,22 @@ mod tests {
         pc.close();
     }
 
+    /// RIFT PATCH: a pass-through connection's configuration can be set again
+    /// with smoothing left at its default, as LiveKit's Room does on joining,
+    /// and smoothing stays as it was made.
+    #[tokio::test]
+    async fn passthrough_configuration_can_be_set_again() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let factory =
+            crate::peer_connection_factory::PeerConnectionFactory::with_video_decoder_backend(
+                crate::peer_connection_factory::VideoDecoderBackend::PassThrough,
+            );
+        let pc = factory.create_peer_connection(RtcConfiguration::default()).unwrap();
+        pc.set_configuration(RtcConfiguration::default()).expect("set again");
+        assert!(!pc.handle.sys_handle.prerenderer_smoothing());
+        pc.close();
+    }
+
     #[test]
     fn video_decoder_backend_maps_to_native_enum() {
         use crate::peer_connection_factory::VideoDecoderBackend;

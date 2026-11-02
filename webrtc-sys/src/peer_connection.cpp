@@ -110,8 +110,18 @@ bool PeerConnection::Initialize(
 }
 
 void PeerConnection::set_configuration(RtcConfiguration config) const {
-  auto result =
-      peer_connection_->SetConfiguration(to_native_rtc_configuration(config));
+  webrtc::PeerConnectionInterface::RTCConfiguration rtc_config =
+      to_native_rtc_configuration(config);
+  // RIFT PATCH: pre-render smoothing is set at creation only, where a
+  // pass-through factory turns it off by default, and libwebrtc refuses any
+  // later change to it. Left at its default here, it keeps what the
+  // connection has, so a configuration set again (as LiveKit's Room does on
+  // joining) is not refused.
+  if (config.prerenderer_smoothing == PrerendererSmoothing::Default) {
+    rtc_config.set_prerenderer_smoothing(
+        peer_connection_->GetConfiguration().prerenderer_smoothing());
+  }
+  auto result = peer_connection_->SetConfiguration(rtc_config);
 
   if (!result.ok()) {
     throw std::runtime_error(serialize_error(to_error(result)));
