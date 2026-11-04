@@ -21,29 +21,13 @@
 mod tests {
     #[cxx::bridge(namespace = "livekit_ffi")]
     pub mod ffi_tests {
-        /// What one `Decode()` call produced.
-        #[derive(Debug)]
-        struct DecodeForTest {
-            emitted: bool,
-            rtp_timestamp_matches: bool,
-            shares_payload: bool,
-            return_code: i32,
-            width: i32,
-            height: i32,
-            sequence: u64,
-            keyframe: bool,
-        }
-
         unsafe extern "C++" {
             include!("livekit/passthrough_video_decoder.h");
 
             /// Drives a `PassthroughVideoDecoder` with `script` (op codes mirrored
-            /// below). Ops that decode use `payload` as the access unit.
-            fn passthrough_decode_for_test(
-                codec: &str,
-                script: &[u8],
-                payload: &[u8],
-            ) -> Vec<DecodeForTest>;
+            /// below). Ops that decode use `payload` as the access unit. Eight
+            /// values per decode, read by [`super::decode_for_test`].
+            fn passthrough_decode_for_test(codec: &str, script: &[u8], payload: &[u8]) -> Vec<i64>;
 
             /// `implementation_name` and `is_hardware_accelerated` of the decoder.
             fn passthrough_decoder_info_for_test() -> String;
@@ -76,6 +60,40 @@ mod tests {
         }
     }
 
+    /// What one `Decode()` call produced. Plain Rust rather than a bridge
+    /// struct: the C++ helper is compiled into every build, and MSVC links the
+    /// Rust side of a `rust::Vec` of a bridge struct, which only a test build
+    /// has (LNK2019 on Windows).
+    #[derive(Debug)]
+    struct DecodeForTest {
+        emitted: bool,
+        rtp_timestamp_matches: bool,
+        shares_payload: bool,
+        return_code: i32,
+        width: i32,
+        height: i32,
+        sequence: u64,
+        keyframe: bool,
+    }
+
+    fn decode_for_test(codec: &str, script: &[u8], payload: &[u8]) -> Vec<DecodeForTest> {
+        let values = ffi_tests::passthrough_decode_for_test(codec, script, payload);
+        assert_eq!(values.len() % 8, 0, "{values:?}");
+        values
+            .chunks(8)
+            .map(|v| DecodeForTest {
+                emitted: v[0] != 0,
+                rtp_timestamp_matches: v[1] != 0,
+                shares_payload: v[2] != 0,
+                return_code: v[3] as i32,
+                width: v[4] as i32,
+                height: v[5] as i32,
+                sequence: v[6] as u64,
+                keyframe: v[7] != 0,
+            })
+            .collect()
+    }
+
     const AUTO: i32 = 0;
     const PASS_THROUGH: i32 = 1;
     const PASSTHROUGH_NAME: &str = "LiveKit encoded passthrough";
@@ -99,11 +117,7 @@ mod tests {
     /// input's RTP timestamp.
     #[test]
     fn passthrough_emits_every_frame_with_input_rtp_timestamp() {
-        let results = ffi_tests::passthrough_decode_for_test(
-            "H264",
-            &[KEY_64X64, DELTA, DELTA, DELTA],
-            PAYLOAD,
-        );
+        let results = decode_for_test("H264", &[KEY_64X64, DELTA, DELTA, DELTA], PAYLOAD);
         assert_eq!(results.len(), 4);
         for r in &results {
             assert!(r.emitted, "{r:?}");
@@ -117,15 +131,14 @@ mod tests {
     /// The emitted buffer shares the received payload instead of copying it.
     #[test]
     fn passthrough_shares_payload_without_copy() {
-        let results = ffi_tests::passthrough_decode_for_test("H264", &[KEY_64X64, DELTA], PAYLOAD);
+        let results = decode_for_test("H264", &[KEY_64X64, DELTA], PAYLOAD);
         assert!(results.iter().all(|r| r.shares_payload), "{results:?}");
     }
 
     /// Delta frames carry no dimensions; they report the last keyframe's.
     #[test]
     fn delta_frames_inherit_last_keyframe_dimensions() {
-        let results =
-            ffi_tests::passthrough_decode_for_test("H264", &[KEY_64X64, DELTA, DELTA], PAYLOAD);
+        let results = decode_for_test("H264", &[KEY_64X64, DELTA, DELTA], PAYLOAD);
         for r in &results {
             assert_eq!((r.width, r.height), (64, 64), "{r:?}");
         }
@@ -136,11 +149,7 @@ mod tests {
     /// reconfigure a decoder on resolution change).
     #[test]
     fn keyframe_with_new_dimensions_updates_cache_without_new_identity() {
-        let results = ffi_tests::passthrough_decode_for_test(
-            "H264",
-            &[KEY_64X64, DELTA, KEY_128X72, DELTA],
-            PAYLOAD,
-        );
+        let results = decode_for_test("H264", &[KEY_64X64, DELTA, KEY_128X72, DELTA], PAYLOAD);
         let dims: Vec<_> = results.iter().map(|r| (r.width, r.height)).collect();
         assert_eq!(dims, [(64, 64), (64, 64), (128, 72), (128, 72)]);
         let sequence: Vec<_> = results.iter().map(|r| r.sequence).collect();
@@ -152,7 +161,7 @@ mod tests {
     #[test]
     fn av1_dimensions_come_from_sequence_header() {
         let (_, keyframe) = AV1.units[0];
-        let results = ffi_tests::passthrough_decode_for_test("AV1", &[KEY_NO_DIMS], keyframe);
+        let results = decode_for_test("AV1", &[KEY_NO_DIMS], keyframe);
         assert_eq!((results[0].width, results[0].height), (AV1.width as i32, AV1.height as i32));
     }
 
@@ -160,11 +169,8 @@ mod tests {
     /// `OK_REQUEST_KEYFRAME` once; the frame is still emitted.
     #[test]
     fn keyframe_flag_returns_ok_request_keyframe_once() {
-        let results = ffi_tests::passthrough_decode_for_test(
-            "H264",
-            &[KEY_64X64, SET_KEYFRAME_FLAG, DELTA, DELTA],
-            PAYLOAD,
-        );
+        let results =
+            decode_for_test("H264", &[KEY_64X64, SET_KEYFRAME_FLAG, DELTA, DELTA], PAYLOAD);
         let codes: Vec<_> = results.iter().map(|r| r.return_code).collect();
         assert_eq!(codes, [OK, OK_REQUEST_KEYFRAME, OK]);
         assert!(results.iter().all(|r| r.emitted));
@@ -177,8 +183,7 @@ mod tests {
         assert_eq!(ids.len(), 2);
         assert_ne!(ids[0], 0);
         assert_ne!(ids[0], ids[1]);
-        let results =
-            ffi_tests::passthrough_decode_for_test("VP8", &[KEY_64X64, DELTA, DELTA], PAYLOAD);
+        let results = decode_for_test("VP8", &[KEY_64X64, DELTA, DELTA], PAYLOAD);
         let sequence: Vec<_> = results.iter().map(|r| r.sequence).collect();
         assert_eq!(sequence, [0, 1, 2]);
     }

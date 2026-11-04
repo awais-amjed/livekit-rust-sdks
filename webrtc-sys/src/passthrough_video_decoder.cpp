@@ -238,7 +238,7 @@ livekit::EncodedVideoCodec CodecForTest(std::string_view name) {
 
 }  // namespace
 
-rust::Vec<DecodeForTest> passthrough_decode_for_test(
+rust::Vec<int64_t> passthrough_decode_for_test(
     rust::Str codec,
     rust::Slice<const uint8_t> script,
     rust::Slice<const uint8_t> payload) {
@@ -248,7 +248,7 @@ rust::Vec<DecodeForTest> passthrough_decode_for_test(
   CapturingCallback callback;
   decoder.RegisterDecodeCompleteCallback(&callback);
 
-  rust::Vec<DecodeForTest> results;
+  rust::Vec<int64_t> results;
   uint32_t rtp_timestamp = 1000;
   for (uint8_t op : script) {
     if (op == kDecodeTestSetKeyframeFlag) {
@@ -279,24 +279,34 @@ rust::Vec<DecodeForTest> passthrough_decode_for_test(
     }
 
     const size_t before = callback.frames.size();
-    DecodeForTest result{};
-    result.return_code = decoder.Decode(image, /*render_time_ms=*/0);
-    result.emitted = callback.frames.size() == before + 1;
-    if (result.emitted) {
+    const int32_t return_code = decoder.Decode(image, /*render_time_ms=*/0);
+    const bool emitted = callback.frames.size() == before + 1;
+    bool rtp_timestamp_matches = false;
+    bool shares_payload = false;
+    int32_t width = 0;
+    int32_t height = 0;
+    uint64_t sequence = 0;
+    bool keyframe = false;
+    if (emitted) {
       const webrtc::VideoFrame& frame = callback.frames.back();
       auto* buffer = livekit::EncodedVideoFrameBuffer::FromNative(
           frame.video_frame_buffer().get());
-      result.rtp_timestamp_matches = frame.rtp_timestamp() == rtp_timestamp;
-      result.width = frame.width();
-      result.height = frame.height();
+      rtp_timestamp_matches = frame.rtp_timestamp() == rtp_timestamp;
+      width = frame.width();
+      height = frame.height();
       if (buffer) {
-        result.shares_payload = buffer->payload_data() == data->data();
-        result.sequence = buffer->sequence_number();
-        result.keyframe =
-            buffer->frame_type() == livekit::EncodedFrameType::kKey;
+        shares_payload = buffer->payload_data() == data->data();
+        sequence = buffer->sequence_number();
+        keyframe = buffer->frame_type() == livekit::EncodedFrameType::kKey;
       }
     }
-    results.push_back(result);
+    for (int64_t value :
+         {int64_t{emitted}, int64_t{rtp_timestamp_matches},
+          int64_t{shares_payload}, int64_t{return_code}, int64_t{width},
+          int64_t{height}, static_cast<int64_t>(sequence),
+          int64_t{keyframe}}) {
+      results.push_back(value);
+    }
   }
   return results;
 }

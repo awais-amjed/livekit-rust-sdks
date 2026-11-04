@@ -70,7 +70,15 @@ needs. Everything else is upstream, unchanged.
    joined. `set_configuration` now keeps the connection's smoothing when the
    configuration leaves it at its default. Verified Nov 2 2026 against
    livekit-server: encrypted VP8, VP9 and H264 shares read still encoded and
-   decoded by Rift on an Intel GPU, none lost.
+   decoded by Rift on an Intel GPU, none lost. And a second fix to the PR,
+   for Windows: its test helper `passthrough_decode_for_test` is compiled
+   into every build, and returned a `rust::Vec` of a bridge struct whose
+   Rust side only a test build has. MSVC's linker wants that side anyway
+   (LNK2019, the PR's own Windows CI failure), where Linux's drops the unused
+   helper. It now returns eight numbers per decode, which the test reads back
+   into the same struct. Verified Nov 4 2026: Rift's library linked for
+   Windows (cargo-xwin, lld-link) where it failed before, and the decoder's
+   tests pass on Linux.
 
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more

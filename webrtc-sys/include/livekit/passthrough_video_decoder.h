@@ -98,9 +98,10 @@ constexpr uint8_t kDecodeTestKeyNoDims = 2;
 constexpr uint8_t kDecodeTestDelta = 3;
 constexpr uint8_t kDecodeTestSetKeyframeFlag = 4;
 
-struct DecodeForTest;
-
-rust::Vec<DecodeForTest> passthrough_decode_for_test(
+// Eight values per Decode() call, in DecodeForTest's field order (the Rust
+// test unpacks them). Not a shared struct: MSVC links the Rust side of a
+// rust::Vec of one, which only a test build has.
+rust::Vec<int64_t> passthrough_decode_for_test(
     rust::Str codec,
     rust::Slice<const uint8_t> script,
     rust::Slice<const uint8_t> payload);
