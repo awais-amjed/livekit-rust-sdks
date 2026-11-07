@@ -80,6 +80,24 @@ needs. Everything else is upstream, unchanged.
    Windows (cargo-xwin, lld-link) where it failed before, and the decoder's
    tests pass on Linux.
 
+6. **`webrtc-sys`: a pre-encoded H265 track can be sent where no real encoder
+   lists H265.** The encoder factory advertised a pass-through format only for
+   a codec some real encoder has, and on Linux and Windows without LiveKit's
+   NVENC none has H265. H265 now passes that filter, by its one name WebRTC
+   knows (`H265`, not `HEVC`). A track asks for its own codec alone, so only a
+   pre-encoded track that asked for H265 negotiates it. The prebuilt libwebrtc
+   packetizes it and its frame cryptor handles it. Verified Nov 7 2026 against
+   livekit-server 1.13.7: encrypted H265 from FFmpeg's `hevc_vaapi` (Intel) and
+   `hevc_nvenc`, read still encoded and decoded by Rift on an Intel GPU, 40
+   keyframes in 20 s with every picture drawn.
+
+7. **`livekit`: a local participant can read the codecs the server takes**
+   (`LocalParticipant::enabled_publish_codecs`), from the join response, which
+   the SDK otherwise drops. A server with H265 off does not refuse a track
+   published in H265: `publish_track` succeeds, the server lists the track as
+   VP8, and viewers get no picture (seen Nov 7 2026 on livekit-server 1.13 with
+   `room.enabled_codecs`). So a publisher has to ask first.
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was
