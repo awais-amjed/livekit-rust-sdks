@@ -46,6 +46,8 @@ struct TransportInner {
     // Whether an offer carrying `x-google-start-bitrate` has been accepted locally. The
     // hint is written once per peer connection; see `compute_start_bitrate_kbps`.
     start_bitrate_applied: bool,
+    // The hint just offered, until its answer is in: see `munge_h265_start_bitrate`.
+    start_bitrate_to_answer: Option<u32>,
     pending_initial_offer: Option<SessionDescription>,
 }
 
@@ -87,6 +89,7 @@ impl PeerTransport {
                 max_send_bitrate_is_screen_share: false,
                 connection_setup_time: None,
                 start_bitrate_applied: false,
+                start_bitrate_to_answer: None,
                 pending_initial_offer: None,
             })),
             connected_generation: AtomicU32::new(0),
@@ -166,6 +169,13 @@ impl PeerTransport {
             self.peer_connection.set_local_description(pending_offer).await?;
         }
 
+        let remote_description = match inner.start_bitrate_to_answer {
+            Some(kbps) if remote_description.sdp_type() == SdpType::Answer => {
+                inner.start_bitrate_to_answer = None;
+                Self::with_h265_start_bitrate(remote_description, kbps)
+            }
+            _ => remote_description,
+        };
         self.peer_connection.set_remote_description(remote_description).await?;
 
         // Apply every queued candidate, even if one fails. A candidate can be rejected on its
@@ -452,6 +462,48 @@ impl PeerTransport {
     }
 
     fn munge_x_google_start_bitrate(sdp: &str, start_bitrate_kbps: u32) -> String {
+        Self::munge_start_bitrate_of(sdp, start_bitrate_kbps, Self::is_video_codec)
+    }
+
+    /// Put the hint in an answer's H265, where the server leaves it out.
+    ///
+    /// libwebrtc reads the hint from the send codec in the answer, not from the offer. The
+    /// server repeats the offer's parameters for H264 but answers H265 with its own
+    /// (livekit-server 1.13), so an H265 track was left at libwebrtc's 300 kbps. Its probes
+    /// then reached too little to tell, and on a still screen the estimate fell to the floor
+    /// with nothing to climb back to: a picture that then moved took most of a minute to
+    /// reach its rate on Intel.
+    ///
+    /// Capped at [`Self::MAX_START_BITRATE_KBPS`]. Any hint from 3 Mbps up sends the first
+    /// probes at 5 Mbps, which a slow upload loses. 1 Mbps climbed as fast on a fast link
+    /// (10 s to 90% of 11 Mbps, against 10 to 12 s at 3, 5 and 9.9 Mbps) and was the gentlest
+    /// of them on a 1 Mbps upload (Intel, Nov 8 2026).
+    fn munge_h265_start_bitrate(sdp: &str, start_bitrate_kbps: u32) -> String {
+        Self::munge_start_bitrate_of(sdp, start_bitrate_kbps, |codec| {
+            codec.starts_with("H265/90000")
+        })
+    }
+
+    fn with_h265_start_bitrate(answer: SessionDescription, kbps: u32) -> SessionDescription {
+        let sdp = answer.to_string();
+        let munged = Self::munge_h265_start_bitrate(&sdp, kbps.min(Self::MAX_START_BITRATE_KBPS));
+        if munged == sdp {
+            return answer;
+        }
+        match SessionDescription::parse(&munged, answer.sdp_type()) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                log::warn!("Failed to parse the answer with the H265 start bitrate: {e}");
+                answer
+            }
+        }
+    }
+
+    fn munge_start_bitrate_of(
+        sdp: &str,
+        start_bitrate_kbps: u32,
+        is_target: fn(&str) -> bool,
+    ) -> String {
         // Detect what line ending the original SDP uses
         let uses_crlf = sdp.contains("\r\n");
         let eol = if uses_crlf { "\r\n" } else { "\n" };
@@ -468,7 +520,7 @@ impl PeerTransport {
                 let mut it = rest.split_whitespace();
                 let pt = it.next().unwrap_or("");
                 let codec = it.next().unwrap_or("");
-                if Self::is_video_codec(codec) && !pt.is_empty() {
+                if is_target(codec) && !pt.is_empty() {
                     target_pts.push(pt);
                 }
             }
@@ -533,7 +585,7 @@ impl PeerTransport {
                 let mut it = rest.split_whitespace();
                 let pt = it.next().unwrap_or("");
                 let codec = it.next().unwrap_or("");
-                if Self::is_video_codec(codec) && !pt.is_empty() && !pts_with_fmtp.contains(pt) {
+                if is_target(codec) && !pt.is_empty() && !pts_with_fmtp.contains(pt) {
                     // Create fmtp line with x-google-start-bitrate
                     let fmtp_line =
                         format!("a=fmtp:{pt} x-google-start-bitrate={start_bitrate_kbps}");
@@ -626,7 +678,7 @@ impl PeerTransport {
         // x-google-max-bitrate is deliberately never written: the same Call-level promotion
         // would turn a per-track cap into a ceiling on total send bandwidth, starving concurrent
         // tracks. Per-track and per-layer caps belong in the encodings' max_bitrate.
-        let mut applied_start_bitrate = false;
+        let mut applied_start_bitrate = None;
         let has_video = sdp.contains(" VP8/90000")
             || sdp.contains(" VP9/90000")
             || sdp.contains(" AV1/90000")
@@ -651,7 +703,7 @@ impl PeerTransport {
                     match SessionDescription::parse(&munged, offer.sdp_type()) {
                         Ok(parsed) => {
                             offer = parsed;
-                            applied_start_bitrate = true;
+                            applied_start_bitrate = Some(start_kbps);
                         }
                         Err(e) => log::warn!(
                             "Failed to parse munged SDP, falling back to original offer: {e}"
@@ -666,8 +718,9 @@ impl PeerTransport {
         self.peer_connection.set_local_description(offer.clone()).await?;
 
         // Only consume the one-shot hint once the offer carrying it is accepted locally.
-        if applied_start_bitrate {
+        if applied_start_bitrate.is_some() {
             inner.start_bitrate_applied = true;
+            inner.start_bitrate_to_answer = applied_start_bitrate;
         }
 
         if let Some(handler) = self.on_offer_handler.lock().as_mut() {
@@ -929,6 +982,31 @@ a=fmtp:111 minptime=10;useinbandfec=1\n";
         assert_eq!(screen_share(1273), Some(2700), "a fast setup");
         assert_eq!(screen_share(2500), Some(2700), "mid-ramp");
         assert_eq!(screen_share(4061), Some(2700), "past the slow anchor");
+    }
+
+    #[test]
+    fn an_answer_gets_the_hint_on_h265_alone() {
+        let sdp = "v=0\r\n\
+m=video 9 UDP/TLS/RTP/SAVPF 107 37 38\r\n\
+a=rtpmap:107 H264/90000\r\n\
+a=fmtp:107 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640034\r\n\
+a=rtpmap:37 H265/90000\r\n\
+a=fmtp:37 level-id=93;tx-mode=SRST\r\n\
+a=rtpmap:38 rtx/90000\r\n\
+a=fmtp:38 apt=37\r\n";
+        let out = PeerTransport::munge_h265_start_bitrate(sdp, 9900);
+        assert!(out.contains("a=fmtp:37 level-id=93;tx-mode=SRST;x-google-start-bitrate=9900\r\n"));
+        assert!(out.contains("profile-level-id=640034\r\n"), "H264 is the server's to answer");
+        assert!(out.contains("a=fmtp:38 apt=37\r\n"), "rtx carries no hint");
+    }
+
+    #[test]
+    fn an_answer_without_h265_is_left_alone() {
+        let sdp = "v=0\r\n\
+m=video 9 UDP/TLS/RTP/SAVPF 107\r\n\
+a=rtpmap:107 H264/90000\r\n\
+a=fmtp:107 packetization-mode=1;x-google-start-bitrate=10800\r\n";
+        assert_eq!(PeerTransport::munge_h265_start_bitrate(sdp, 9900), sdp);
     }
 
     #[test]
