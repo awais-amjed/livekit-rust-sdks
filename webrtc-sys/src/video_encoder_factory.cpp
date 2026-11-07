@@ -398,17 +398,22 @@ VideoEncoderFactory::InternalFactory::GetSupportedFormats() const {
   // negotiating such a codec would end up with a sender that cannot create
   // an encoder. Only advertise pass-through formats for codecs some real
   // encoder already supports.
+  // RIFT PATCH: but H265 always, the name WebRTC knows it by. A track asks for
+  // its codec alone (RtcSession::create_transceiver's preferences), so only a
+  // pre-encoded track that asked for H265 ever negotiates it, and Rift's come
+  // from its own GPU encoder on systems where no real encoder here lists it.
   const size_t real_format_count = formats.size();
   for (const auto& backend_factory : factories_) {
     if (backend_factory.backend != VideoEncoderBackend::PreEncoded) {
       continue;
     }
     for (const auto& format : backend_factory.factory->GetSupportedFormats()) {
-      const bool codec_available = std::any_of(
-          formats.begin(), formats.begin() + real_format_count,
-          [&](const webrtc::SdpVideoFormat& existing) {
-            return IsSameCodecName(existing.name, format.name);
-          });
+      const bool codec_available =
+          format.name == "H265" ||
+          std::any_of(formats.begin(), formats.begin() + real_format_count,
+                      [&](const webrtc::SdpVideoFormat& existing) {
+                        return IsSameCodecName(existing.name, format.name);
+                      });
       if (codec_available) {
         formats.push_back(format);
       }
@@ -439,18 +444,19 @@ VideoEncoderFactory::InternalFactory::GetImplementations() const {
   // RIFT PATCH: the pass-through's own formats too, so one that no real
   // encoder lists (H264 High) can be sent: WebRTC sends only a negotiated
   // codec it finds among these ("No video codecs in common"). The same
-  // filter as GetSupportedFormats: only a codec some real encoder has.
+  // filter as GetSupportedFormats: only a codec some real encoder has, or H265.
   const size_t real_format_count = formats.size();
   for (const auto& backend_factory : factories_) {
     if (backend_factory.backend != VideoEncoderBackend::PreEncoded) {
       continue;
     }
     for (const auto& format : backend_factory.factory->GetImplementations()) {
-      const bool codec_available = std::any_of(
-          formats.begin(), formats.begin() + real_format_count,
-          [&](const webrtc::SdpVideoFormat& existing) {
-            return IsSameCodecName(existing.name, format.name);
-          });
+      const bool codec_available =
+          format.name == "H265" ||
+          std::any_of(formats.begin(), formats.begin() + real_format_count,
+                      [&](const webrtc::SdpVideoFormat& existing) {
+                        return IsSameCodecName(existing.name, format.name);
+                      });
       if (codec_available) {
         formats.push_back(WithBackend(format, backend_factory.backend));
       }
