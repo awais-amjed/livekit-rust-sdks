@@ -627,6 +627,8 @@ impl Room {
             pi.capabilities.iter().filter_map(|&c| ClientCapability::try_from(c).ok()).collect(),
         );
 
+        local_participant.set_enabled_publish_codecs(&join_response.enabled_publish_codecs);
+
         let dispatcher = Dispatcher::<RoomEvent>::default();
         local_participant.on_local_track_published({
             let dispatcher = dispatcher.clone();
@@ -1818,6 +1820,7 @@ impl RoomSession {
         join_response: proto::JoinResponse,
         tx: oneshot::Sender<()>,
     ) {
+        self.local_participant.set_enabled_publish_codecs(&join_response.enabled_publish_codecs);
         self.local_participant.update_info(join_response.participant.unwrap()); // The sid may have changed
 
         self.handle_participant_update(join_response.other_participants);

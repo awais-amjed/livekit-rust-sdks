@@ -76,6 +76,7 @@ struct LocalInfo {
     all_participants_allowed: Mutex<bool>,
     track_permissions: Mutex<Vec<ParticipantTrackPermission>>,
     session: RwLock<Option<Weak<RoomSession>>>,
+    enabled_publish_codecs: RwLock<Vec<String>>,
 }
 
 #[derive(Clone)]
@@ -134,6 +135,7 @@ impl LocalParticipant {
                 all_participants_allowed: Mutex::new(true),
                 track_permissions: Mutex::new(vec![]),
                 session: Default::default(),
+                enabled_publish_codecs: Default::default(),
             }),
         }
     }
@@ -152,6 +154,18 @@ impl LocalParticipant {
 
     pub(crate) fn update_info(&self, info: proto::ParticipantInfo) {
         super::update_info(&self.inner, &Participant::Local(self.clone()), info);
+    }
+
+    pub(crate) fn set_enabled_publish_codecs(&self, codecs: &[proto::Codec]) {
+        *self.local.enabled_publish_codecs.write() =
+            codecs.iter().map(|codec| codec.mime.to_lowercase()).collect();
+    }
+
+    /// The codecs the server said it takes when this participant joined, as
+    /// lower-case MIME types (`video/h265`). Publishing another is not refused:
+    /// the server takes the track as something else and viewers get nothing.
+    pub fn enabled_publish_codecs(&self) -> Vec<String> {
+        self.local.enabled_publish_codecs.read().clone()
     }
 
     pub(crate) fn set_speaking(&self, speaking: bool) {

@@ -91,6 +91,13 @@ needs. Everything else is upstream, unchanged.
    `hevc_nvenc`, read still encoded and decoded by Rift on an Intel GPU, 40
    keyframes in 20 s with every picture drawn.
 
+7. **`livekit`: a local participant can read the codecs the server takes**
+   (`LocalParticipant::enabled_publish_codecs`), from the join response, which
+   the SDK otherwise drops. A server with H265 off does not refuse a track
+   published in H265: `publish_track` succeeds, the server lists the track as
+   VP8, and viewers get no picture (seen Nov 7 2026 on livekit-server 1.13 with
+   `room.enabled_codecs`). So a publisher has to ask first.
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was
