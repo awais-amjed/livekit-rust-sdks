@@ -98,6 +98,16 @@ needs. Everything else is upstream, unchanged.
    VP8, and viewers get no picture (seen Nov 7 2026 on livekit-server 1.13 with
    `room.enabled_codecs`). So a publisher has to ask first.
 
+8. **`livekit`: an H265 track gets the start bitrate hint.** libwebrtc reads
+   `x-google-start-bitrate` from the answer. The server repeats the offer's
+   parameters for H264 but answers H265 with its own, so an H265 track started
+   at libwebrtc's 300 kbps (livekit-server 1.13, seen Nov 8 2026). On a still
+   screen its estimate then fell to the floor with nothing to climb back to, and
+   a picture that moved took most of a minute to reach its rate. The hint now goes
+   into the answer's H265 too, capped at 1 Mbps: from 3 Mbps up the first probes
+   go out at 5 Mbps, which a slow upload loses. It can go when the server repeats
+   H265's parameters as it does H264's.
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was
