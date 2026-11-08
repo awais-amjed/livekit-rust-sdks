@@ -1,7 +1,7 @@
 # The `rift` branch
 
-LiveKit's Rust SDKs at the commit that released `livekit` 0.9.5 and
-`webrtc-sys` 0.3.49 (`49b3ebe9`), with the changes [Rift](https://joinrift.app)
+LiveKit's Rust SDKs at the commit that released `livekit` 0.10.1,
+`libwebrtc` 0.4.0 and `webrtc-sys` 0.3.53 (`88705b15`), with the changes [Rift](https://joinrift.app)
 needs. Everything else is upstream, unchanged.
 
 1. **`livekit`: a two-channel audio track is published in stereo.** The server
@@ -48,7 +48,8 @@ needs. Everything else is upstream, unchanged.
    - The encoder factory's implementations list the pass-through's formats.
      WebRTC sends only a negotiated codec it finds there; baseline was there
      through the software encoder and High was not ("No video codecs in
-     common", nothing sent).
+     common", nothing sent). Since 0.10.1 upstream lists them for a codec no
+     real encoder has (item 6); this adds them for one a real encoder has too.
 
 5. **Pass-through decoding, taken from upstream before it is merged.** PR
    [#1515](https://github.com/livekit/rust-sdks/pull/1515) (open upstream,
@@ -80,16 +81,10 @@ needs. Everything else is upstream, unchanged.
    Windows (cargo-xwin, lld-link) where it failed before, and the decoder's
    tests pass on Linux.
 
-6. **`webrtc-sys`: a pre-encoded H265 track can be sent where no real encoder
-   lists H265.** The encoder factory advertised a pass-through format only for
-   a codec some real encoder has, and on Linux and Windows without LiveKit's
-   NVENC none has H265. H265 now passes that filter, by its one name WebRTC
-   knows (`H265`, not `HEVC`). A track asks for its own codec alone, so only a
-   pre-encoded track that asked for H265 negotiates it. The prebuilt libwebrtc
-   packetizes it and its frame cryptor handles it. Verified Nov 7 2026 against
-   livekit-server 1.13.7: encrypted H265 from FFmpeg's `hevc_vaapi` (Intel) and
-   `hevc_nvenc`, read still encoded and decoded by Rift on an Intel GPU, 40
-   keyframes in 20 s with every picture drawn.
+6. **Gone: a pre-encoded H265 track sent where no real encoder lists H265.**
+   This branch carried it from Nov 7 2026; `livekit` 0.10.1 does the same
+   ([#1451](https://github.com/livekit/rust-sdks/pull/1451)), listing a
+   pass-through codec no real encoder has, and was taken in its place.
 
 7. **`livekit`: a local participant can read the codecs the server takes**
    (`LocalParticipant::enabled_publish_codecs`), from the join response, which
@@ -111,7 +106,8 @@ needs. Everything else is upstream, unchanged.
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was
-dropped. The earlier branch is kept as the tag `rift-livekit-0.9.1`.
+dropped. The earlier branches are kept as the tags `rift-livekit-0.9.1` and
+`rift-livekit-0.9.5`, so commits pinned before each move still resolve.
 
 ## Using it
 
