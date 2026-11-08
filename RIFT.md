@@ -50,6 +50,9 @@ needs. Everything else is upstream, unchanged.
      through the software encoder and High was not ("No video codecs in
      common", nothing sent). Since 0.10.1 upstream lists them for a codec no
      real encoder has (item 6); this adds them for one a real encoder has too.
+     Its supported formats likewise list only one entry for such a codec, so
+     a pass-through format a listed codec lacks (High) is added there as well;
+     before 0.10.1 they listed every pass-through format of a listed codec.
 
 5. **Pass-through decoding, taken from upstream before it is merged.** PR
    [#1515](https://github.com/livekit/rust-sdks/pull/1515) (open upstream,

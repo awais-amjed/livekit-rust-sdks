@@ -416,6 +416,18 @@ VideoEncoderFactory::InternalFactory::GetSupportedFormats() const {
                       });
       if (!codec_listed) {
         formats.push_back(format);
+        continue;
+      }
+      // RIFT PATCH: and a pass-through format of a listed codec that no
+      // listed format matches, profile and all: H264 High, which no real
+      // encoder lists. Without it High is never offered (RIFT.md, item 4).
+      const bool format_listed =
+          std::any_of(formats.begin(), formats.end(),
+                      [&](const webrtc::SdpVideoFormat& existing) {
+                        return existing.IsSameCodec(format);
+                      });
+      if (!format_listed) {
+        formats.push_back(format);
       }
     }
   }
