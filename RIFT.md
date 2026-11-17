@@ -106,6 +106,20 @@ needs. Everything else is upstream, unchanged.
    go out at 5 Mbps, which a slow upload loses. It can go when the server repeats
    H265's parameters as it does H264's.
 
+9. **`livekit`: a closed room lets go of its remote participants**, taken
+   from upstream before Rift moves to its release: PR
+   [#1654](https://github.com/livekit/rust-sdks/pull/1654) (`livekit` 0.11.0),
+   cherry-picked unchanged. Each remote publication held callbacks that held
+   its own participant and the room's engine, and `close` never cleared the
+   participants, so a room closed while anyone else had a track published
+   kept the shared runtime alive for the rest of the process: its network,
+   signaling and worker threads, a frame cryptor's thread when encrypted, and
+   the synthetic audio device ticking every 10 ms. Rift on Windows woke about
+   480 more times a second after every call it had watched a share in (seen
+   Nov 17 2026). Verified Nov 18 2026 against livekit-server, by Rift's
+   `live_watch_leaves_nothing_running_after_the_call`: those threads were
+   still there after the close before, and gone after.
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was
