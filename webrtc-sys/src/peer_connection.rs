@@ -118,6 +118,12 @@ pub mod ffi {
         // Read at creation only: SetConfiguration keeps the creation-time
         // media config.
         pub prerenderer_smoothing: PrerendererSmoothing,
+        // RIFT PATCH: `MediaConfig::Video::periodic_alr_bandwidth_probing`,
+        // read at creation only like the smoothing above.
+        pub periodic_alr_bandwidth_probing: bool,
+        // RIFT PATCH: a ceiling for the connection's estimate, set with
+        // SetBitrate once the connection is made; 0 for none.
+        pub max_bitrate_bps: i32,
     }
 
     extern "C++" {
@@ -229,6 +235,8 @@ pub mod ffi {
         fn close(self: &PeerConnection);
         /// Whether libwebrtc's pre-render smoothing is on for this connection.
         fn prerenderer_smoothing(self: &PeerConnection) -> bool;
+        /// RIFT PATCH: whether the connection probes while application-limited.
+        fn periodic_alr_bandwidth_probing(self: &PeerConnection) -> bool;
 
         fn _shared_peer_connection() -> SharedPtr<PeerConnection>; // Ignore
     }

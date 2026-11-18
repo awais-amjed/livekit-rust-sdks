@@ -139,6 +139,7 @@ class PeerConnection : webrtc::PeerConnectionObserver {
 
   void close() const;
   bool prerenderer_smoothing() const;
+  bool periodic_alr_bandwidth_probing() const;  // RIFT PATCH
 
   void OnSignalingChange(
       webrtc::PeerConnectionInterface::SignalingState new_state) override;

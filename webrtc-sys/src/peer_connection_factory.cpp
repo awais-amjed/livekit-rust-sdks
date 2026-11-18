@@ -249,6 +249,16 @@ std::shared_ptr<PeerConnection> PeerConnectionFactory::create_peer_connection(
         webrtc::RTCErrorType::INTERNAL_ERROR, "failed to initialize pc"))));
   }
 
+  // RIFT PATCH: without a ceiling of its own, libwebrtc never probes above
+  // 5 Mbps (kDefaultMaxProbingBitrate). Set here, at creation, so a full
+  // reconnect's new connection has it too.
+  if (config.max_bitrate_bps > 0) {
+    BitrateSettings bitrate{};
+    bitrate.has_max_bitrate_bps = true;
+    bitrate.max_bitrate_bps = config.max_bitrate_bps;
+    pc->set_bitrate(bitrate);
+  }
+
   return pc;
 }
 

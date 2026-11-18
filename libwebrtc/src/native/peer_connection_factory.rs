@@ -481,6 +481,38 @@ mod tests {
         pc.close();
     }
 
+    /// RIFT PATCH: periodic probing is set when the connection is made, and a
+    /// configuration set again without it keeps it rather than being refused.
+    #[tokio::test]
+    async fn periodic_alr_probing_is_kept_when_set_again() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let factory = crate::peer_connection_factory::PeerConnectionFactory::default();
+        let pc = factory.create_peer_connection(RtcConfiguration::default()).unwrap();
+        assert!(!pc.handle.sys_handle.periodic_alr_bandwidth_probing());
+        pc.close();
+
+        let mut config = RtcConfiguration::default();
+        config.periodic_alr_bandwidth_probing = true;
+        let pc = factory.create_peer_connection(config).unwrap();
+        assert!(pc.handle.sys_handle.periodic_alr_bandwidth_probing());
+        pc.set_configuration(RtcConfiguration::default()).expect("set again");
+        assert!(pc.handle.sys_handle.periodic_alr_bandwidth_probing());
+        pc.close();
+    }
+
+    /// RIFT PATCH: a connection made with a ceiling opens, and can be
+    /// configured again.
+    #[tokio::test]
+    async fn a_connection_opens_with_a_max_bitrate() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let factory = crate::peer_connection_factory::PeerConnectionFactory::default();
+        let mut config = RtcConfiguration::default();
+        config.max_bitrate_bps = Some(100_000_000);
+        let pc = factory.create_peer_connection(config).unwrap();
+        pc.set_configuration(RtcConfiguration::default()).expect("set again");
+        pc.close();
+    }
+
     #[test]
     fn video_decoder_backend_maps_to_native_enum() {
         use crate::peer_connection_factory::VideoDecoderBackend;

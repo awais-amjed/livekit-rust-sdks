@@ -63,6 +63,11 @@ webrtc::PeerConnectionInterface::RTCConfiguration to_native_rtc_configuration(
     rtc_config.set_prerenderer_smoothing(false);
   }
 
+  // RIFT PATCH: probe the path every few seconds while the application sends
+  // less than the estimate, as libwebrtc does for screen content.
+  rtc_config.media_config.video.periodic_alr_bandwidth_probing =
+      config.periodic_alr_bandwidth_probing;
+
   return rtc_config;
 }
 
@@ -121,6 +126,11 @@ void PeerConnection::set_configuration(RtcConfiguration config) const {
     rtc_config.set_prerenderer_smoothing(
         peer_connection_->GetConfiguration().prerenderer_smoothing());
   }
+  // RIFT PATCH: likewise part of the media config, which libwebrtc refuses to
+  // change once the connection is made.
+  rtc_config.media_config.video.periodic_alr_bandwidth_probing =
+      peer_connection_->GetConfiguration()
+          .media_config.video.periodic_alr_bandwidth_probing;
   auto result = peer_connection_->SetConfiguration(rtc_config);
 
   if (!result.ok()) {
@@ -376,6 +386,12 @@ IceConnectionState PeerConnection::ice_connection_state() const {
 
 bool PeerConnection::prerenderer_smoothing() const {
   return peer_connection_->GetConfiguration().prerenderer_smoothing();
+}
+
+// RIFT PATCH
+bool PeerConnection::periodic_alr_bandwidth_probing() const {
+  return peer_connection_->GetConfiguration()
+      .media_config.video.periodic_alr_bandwidth_probing;
 }
 
 void PeerConnection::close() const {

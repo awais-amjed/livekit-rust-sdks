@@ -347,6 +347,8 @@ mod tests {
             ice_transport_type: IceTransportsType::All,
             enable_sctp_snap: false,
             prerenderer_smoothing: None,
+            periodic_alr_bandwidth_probing: false,
+            max_bitrate_bps: None,
         };
 
         let bob = factory.create_peer_connection(config.clone()).unwrap();

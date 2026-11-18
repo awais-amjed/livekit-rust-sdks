@@ -66,6 +66,20 @@ pub struct RtcConfiguration {
     /// [`VideoDecoderBackend::PassThrough`], where dropping a frame would drop an
     /// access unit the application needs. Applied at creation only.
     pub prerenderer_smoothing: Option<bool>,
+    /// RIFT PATCH: probe the path every few seconds while the application
+    /// sends less than the estimate, which libwebrtc does by itself only for
+    /// screen content. A pre-encoded share must be camera content, so after its
+    /// first seconds a share that went still, or whose estimate fell, was never
+    /// probed back up. Applied at creation only.
+    pub periodic_alr_bandwidth_probing: bool,
+    /// RIFT PATCH: a ceiling for the connection's estimate, in bits per
+    /// second, set with [`PeerConnection::set_bitrate`] when the connection is
+    /// made. Without one, libwebrtc never probes above 5 Mbps, so a share's
+    /// probes, from its first ones on, could not tell it more than that. The
+    /// probes still go no higher than twice what its tracks may send.
+    ///
+    /// [`PeerConnection::set_bitrate`]: crate::peer_connection::PeerConnection::set_bitrate
+    pub max_bitrate_bps: Option<u32>,
 }
 
 impl Default for RtcConfiguration {
@@ -76,6 +90,8 @@ impl Default for RtcConfiguration {
             ice_transport_type: IceTransportsType::All,
             enable_sctp_snap: false,
             prerenderer_smoothing: None,
+            periodic_alr_bandwidth_probing: false,
+            max_bitrate_bps: None,
         }
     }
 }

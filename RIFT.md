@@ -149,6 +149,18 @@ needs. Everything else is upstream, unchanged.
     2026). On a fast link it costs nothing: a 12 Mbps H264 share reached its
     cap in 14 s either way (local server, Nov 19 2026).
 
+13. **`webrtc-sys` and `libwebrtc`: a connection can be made to probe while
+    quiet, and given a ceiling.** `RtcConfiguration` gains
+    `periodic_alr_bandwidth_probing` (libwebrtc's own media config, which it
+    sets by itself only for screen content, and a pre-encoded track must be
+    camera content) and `max_bitrate_bps`, applied with `SetBitrate` when the
+    connection is made, so a full reconnect's new one has it too. Without a
+    ceiling libwebrtc never probes above 5 Mbps. A 12 Mbps share's estimate
+    then stood at 5 Mbps after its first probes, and a picture that moved after
+    20 s still took 14 s to reach its cap; with both, within 2 s (local server,
+    Nov 19 2026). Both are read at creation only, and a configuration set again
+    keeps them.
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was

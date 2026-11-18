@@ -195,6 +195,8 @@ impl From<RtcConfiguration> for sys_pc::ffi::RtcConfiguration {
                 Some(true) => sys_pc::ffi::PrerendererSmoothing::Enabled,
                 Some(false) => sys_pc::ffi::PrerendererSmoothing::Disabled,
             },
+            periodic_alr_bandwidth_probing: value.periodic_alr_bandwidth_probing,
+            max_bitrate_bps: value.max_bitrate_bps.map_or(0, |bps| bps.min(i32::MAX as u32) as i32),
         }
     }
 }
