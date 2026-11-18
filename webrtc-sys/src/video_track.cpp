@@ -210,7 +210,17 @@ bool VideoTrackSource::InternalSource::on_captured_frame(
           livekit::EncodedVideoFrameBuffer::FromNative(buffer.get())) {
     // Numbered under `mutex_`, which also serializes OnFrame, so the
     // pass-through encoder sees the numbers in delivery order.
-    encoded->set_stream_position(this, encoded_sequence_number_++);
+    const uint64_t sequence_number = encoded_sequence_number_++;
+    encoded->set_stream_position(this, sequence_number);
+    // RIFT PATCH: libwebrtc's encoder thread drops the older of two frames
+    // queued for it, which breaks the chain until a keyframe. Frames come
+    // about one picture apart, so an encoder thread a busy CPU kept from
+    // running for longer than that cost a keyframe. 20 ms is a picture at
+    // 50 fps, and bounds what a frame libwebrtc dropped for its own reasons
+    // can delay the one after it; one that runs out rests the waiting for
+    // a second.
+    handover_->WaitForPrevious(sequence_number, std::chrono::milliseconds(20),
+                               std::chrono::seconds(1));
     if (packet_trailer_handler_) {
       packet_trailer_handler_->emit_publish_timing(
           VideoPublishTimingStage::EncoderUpload,
@@ -299,7 +309,8 @@ bool VideoTrackSource::capture_encoded_frame(
       width, height, ToNativeEncodedCodec(encoded_frame.codec),
       ToNativeEncodedFrameType(encoded_frame.frame_type),
       webrtc::EncodedImageBuffer::Create(payload.data(), payload.size()),
-      source_->keyframe_request_flag(), source_->rate_control_state());
+      source_->keyframe_request_flag(), source_->rate_control_state(),
+      source_->handover());
 
   auto frame = webrtc::VideoFrame::Builder()
                    .set_video_frame_buffer(std::move(buffer))
@@ -320,6 +331,10 @@ EncodedRateControlRequest VideoTrackSource::take_rate_control_request() const {
   return EncodedRateControlRequest{request.has_request,
                                    request.target_bitrate_bps,
                                    request.framerate_fps};
+}
+
+uint32_t VideoTrackSource::take_chain_breaks() const {
+  return source_->handover()->TakeChainBreaks();
 }
 
 void VideoTrackSource::set_packet_trailer_handler(
@@ -388,6 +403,44 @@ rust::Vec<uint64_t> encoded_capture_order_for_test(uint32_t threads,
   }
   track_source->RemoveSink(&recorder);
   return recorder.take();
+}
+
+rust::Vec<uint32_t> encoded_handover_for_test() {
+  using std::chrono::milliseconds;
+  livekit::EncodedHandover handover;
+  rust::Vec<uint32_t> results;
+  auto timed = [&](uint64_t sequence_number, milliseconds most) {
+    const auto start = std::chrono::steady_clock::now();
+    handover.WaitForPrevious(sequence_number, most, milliseconds(1000));
+    results.push_back(static_cast<uint32_t>(
+        std::chrono::duration_cast<milliseconds>(
+            std::chrono::steady_clock::now() - start)
+            .count()));
+  };
+  // Nothing taken yet: no wait.
+  timed(1, milliseconds(1000));
+  handover.Taken(0);
+  // The frame before was taken: no wait.
+  timed(1, milliseconds(1000));
+  // Taken while waiting: the wait ends there.
+  std::thread encoder([&] {
+    std::this_thread::sleep_for(milliseconds(50));
+    handover.Taken(1);
+  });
+  timed(2, milliseconds(1000));
+  encoder.join();
+  // Frame 2 is still queued: the whole wait.
+  timed(3, milliseconds(30));
+  // The encoder fell behind (frame 2 never taken): no second wait.
+  timed(4, milliseconds(1000));
+  // Keeping up again, but within a second of a wait that ran out: no wait.
+  handover.Taken(4);
+  timed(6, milliseconds(1000));
+  handover.ChainBroken();
+  handover.ChainBroken();
+  results.push_back(handover.TakeChainBreaks());
+  results.push_back(handover.TakeChainBreaks());
+  return results;
 }
 #endif
 

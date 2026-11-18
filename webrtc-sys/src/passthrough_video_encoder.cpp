@@ -234,6 +234,9 @@ class PassthroughVideoEncoder final : public VideoEncoder {
       return WEBRTC_VIDEO_CODEC_ERR_PARAMETER;
     }
 
+    // RIFT PATCH: so the source hands over the next frame (EncodedHandover).
+    encoded_buffer->taken();
+
     if (CodecTypeFromBuffer(encoded_buffer->codec()) != codec_type_) {
       RTC_LOG(LS_ERROR)
           << "PassthroughVideoEncoder frame codec does not match sender codec";
@@ -374,6 +377,7 @@ class PassthroughVideoEncoder final : public VideoEncoder {
     if (was_intact && !chain_intact_) {
       RTC_LOG(LS_INFO) << "PassthroughVideoEncoder: frame gap before encoder; "
                           "holding delta frames until the next keyframe";
+      buffer.chain_broken();  // RIFT PATCH: counted for the capture side.
     }
     return chain_intact_;
   }
@@ -507,6 +511,7 @@ rust::Vec<uint8_t> passthrough_chain_guard_for_test(
 
   const uint8_t stream = 0;
   auto keyframe_request = std::make_shared<std::atomic<bool>>(false);
+  auto handover = std::make_shared<livekit::EncodedHandover>();
   const uint8_t payload[] = {0, 0, 0, 1, 0x65, 0x88};
   uint64_t sequence_number = 0;
   uint32_t rtp_timestamp = 0;
@@ -520,7 +525,8 @@ rust::Vec<uint8_t> passthrough_chain_guard_for_test(
         64, 64, livekit::EncodedVideoCodec::kH264,
         kind == kChainTestKey ? livekit::EncodedFrameType::kKey
                               : livekit::EncodedFrameType::kDelta,
-        EncodedImageBuffer::Create(payload, sizeof(payload)), keyframe_request);
+        EncodedImageBuffer::Create(payload, sizeof(payload)), keyframe_request,
+        nullptr, handover);
     buffer->set_stream_position(&stream, sequence);
     VideoFrame frame = VideoFrame::Builder()
                            .set_video_frame_buffer(buffer)
@@ -534,6 +540,9 @@ rust::Vec<uint8_t> passthrough_chain_guard_for_test(
     }
     if (keyframe_request->exchange(false)) {
       result |= kChainTestKeyframeRequested;
+    }
+    if (handover->TakeChainBreaks() > 0) {
+      result |= kChainTestChainBroken;
     }
     results.push_back(result);
   }

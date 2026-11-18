@@ -230,6 +230,13 @@ impl NativeVideoSource {
         })
     }
 
+    /// RIFT PATCH: returns and clears how many times the chain of pre-encoded
+    /// frames broke before the pass-through encoder: a frame, or several in a
+    /// row, never reached it, and the frames after were held until a keyframe.
+    pub fn take_chain_breaks(&self) -> u32 {
+        self.sys_handle.take_chain_breaks()
+    }
+
     /// Set the packet trailer handler used by this source.
     ///
     /// When set, any frame captured with a `user_timestamp` value will

@@ -128,6 +128,7 @@ pub mod ffi {
         ) -> bool;
         fn take_keyframe_request(self: &VideoTrackSource) -> bool;
         fn take_rate_control_request(self: &VideoTrackSource) -> EncodedRateControlRequest;
+        fn take_chain_breaks(self: &VideoTrackSource) -> u32;
         fn set_packet_trailer_handler(
             self: &VideoTrackSource,
             handler: SharedPtr<PacketTrailerHandler>,
@@ -197,6 +198,8 @@ mod tests {
             include!("livekit/video_track.h");
 
             fn encoded_capture_order_for_test(threads: u32, frames_per_thread: u32) -> Vec<u64>;
+
+            fn encoded_handover_for_test() -> Vec<u32>;
         }
     }
 
@@ -206,6 +209,7 @@ mod tests {
     const DROPPED: u8 = 2;
     const SENT: u8 = 1;
     const KEY_REQUESTED: u8 = 2;
+    const BROKEN: u8 = 4;
 
     /// Delta frames after a frame dropped before the encoder are held, with a
     /// keyframe request, until the next keyframe restores the chain.
@@ -214,7 +218,7 @@ mod tests {
         let results = ffi_tests::passthrough_chain_guard_for_test(&[
             KEY, DELTA, DROPPED, DELTA, DELTA, KEY, DELTA,
         ]);
-        assert_eq!(results, [SENT, SENT, KEY_REQUESTED, KEY_REQUESTED, SENT, SENT],);
+        assert_eq!(results, [SENT, SENT, KEY_REQUESTED | BROKEN, KEY_REQUESTED, SENT, SENT],);
     }
 
     /// Delta frames before the first keyframe cannot be decoded and are held.
@@ -222,6 +226,21 @@ mod tests {
     fn passthrough_waits_for_first_keyframe() {
         let results = ffi_tests::passthrough_chain_guard_for_test(&[DELTA, KEY, DELTA]);
         assert_eq!(results, [KEY_REQUESTED, SENT, SENT]);
+    }
+
+    /// A source waits for the encoder to take the frame before, only while the
+    /// encoder keeps up, no longer than it is told, and not again for a while
+    /// after a wait runs out.
+    #[test]
+    fn encoded_handover_waits_for_the_frame_before() {
+        let results = ffi_tests::encoded_handover_for_test();
+        let [none, taken, woken, queued, behind, resting, breaks, again] = results[..] else {
+            panic!("{results:?}");
+        };
+        assert!(none < 10 && taken < 10 && behind < 10 && resting < 10, "{results:?}");
+        assert!((20..500).contains(&woken), "{results:?}");
+        assert!((30..500).contains(&queued), "{results:?}");
+        assert_eq!((breaks, again), (2, 0));
     }
 
     /// Concurrent captures are numbered in the order they are delivered, so

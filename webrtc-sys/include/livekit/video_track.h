@@ -117,6 +117,9 @@ class VideoTrackSource {
         const {
       return rate_control_state_;
     }
+    std::shared_ptr<livekit::EncodedHandover> handover() const {
+      return handover_;
+    }
 
    private:
     mutable webrtc::Mutex mutex_;
@@ -131,6 +134,8 @@ class VideoTrackSource {
         std::make_shared<livekit::EncodedRateControlState>();
     // Numbers encoded frames in delivery order; guarded by `mutex_`.
     uint64_t encoded_sequence_number_ = 0;
+    std::shared_ptr<livekit::EncodedHandover> handover_ =
+        std::make_shared<livekit::EncodedHandover>();
     bool is_screencast_;
   };
 
@@ -154,6 +159,9 @@ class VideoTrackSource {
   // capture loop.
   bool take_keyframe_request() const;
   EncodedRateControlRequest take_rate_control_request() const;
+  // RIFT PATCH: returns and clears how many times the chain of encoded
+  // frames broke before the pass-through encoder (EncodedHandover).
+  uint32_t take_chain_breaks() const;
 
   void set_packet_trailer_handler(
       std::shared_ptr<PacketTrailerHandler> handler) const;
@@ -172,6 +180,9 @@ std::shared_ptr<VideoTrackSource> new_video_track_source(
 // sequence numbers in the order a sink received them.
 rust::Vec<uint64_t> encoded_capture_order_for_test(uint32_t threads,
                                                    uint32_t frames_per_thread);
+// Drives an EncodedHandover through its cases and returns, for each, the
+// milliseconds a wait took, then the chain breaks taken twice.
+rust::Vec<uint32_t> encoded_handover_for_test();
 #endif
 
 static std::shared_ptr<MediaStreamTrack> video_to_media(

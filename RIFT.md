@@ -120,6 +120,19 @@ needs. Everything else is upstream, unchanged.
    `live_watch_leaves_nothing_running_after_the_call`: those threads were
    still there after the close before, and gone after.
 
+10. **`webrtc-sys`: a pre-encoded frame waits for the one before it to be
+    taken.** libwebrtc's encoder thread drops the older of two frames queued
+    for it. A raw frame loses nothing by that, but a pre-encoded delta needs
+    every frame before it, so the pass-through encoder holds the deltas after
+    the gap and asks for a keyframe: a PC too busy to run that thread on time
+    paid a keyframe each time (seen in a review of a game share, Nov 18 2026).
+    The source now waits, at most 20 ms, for the pass-through encoder to take
+    a frame before handing over the next, and only while the encoder is
+    keeping up, so a paused encoder costs one wait. A wait that runs out rests
+    the waiting for a second, since the congestion window drops a frame in
+    every few (`EncodedHandover`). The times the chain broke before the
+    encoder are counted (`NativeVideoSource::take_chain_breaks`).
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was

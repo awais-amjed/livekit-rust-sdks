@@ -56,6 +56,7 @@ constexpr uint8_t kChainTestDroppedBeforeEncoder = 2;
 // Result bits, one result per frame that reached the encoder.
 constexpr uint8_t kChainTestSent = 1;
 constexpr uint8_t kChainTestKeyframeRequested = 2;
+constexpr uint8_t kChainTestChainBroken = 4;
 
 // Feeds a frame sequence through a PassthroughVideoEncoder.
 rust::Vec<uint8_t> passthrough_chain_guard_for_test(

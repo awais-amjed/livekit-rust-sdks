@@ -17,6 +17,8 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -57,6 +59,44 @@ class EncodedRateControlState {
   EncodedRateControlRequest request_;
 };
 
+// RIFT PATCH: hands each pre-encoded frame from a source to the pass-through
+// encoder.
+//
+// libwebrtc's encoder thread drops the older of two frames queued for it
+// ("encoder blocked"), which costs raw frames nothing. A pre-encoded delta
+// frame needs every frame before it, so each drop breaks the chain until a
+// keyframe. A source therefore waits, briefly, for the encoder to take a
+// frame before handing over the next. Also counts the frames that never
+// reached the encoder, for the capture side to log.
+class EncodedHandover {
+ public:
+  // The pass-through encoder took frame `sequence_number`.
+  void Taken(uint64_t sequence_number);
+
+  // Called before handing over `sequence_number`: waits up to `most` for the
+  // frame before it to be taken. Only while the encoder is keeping up, having
+  // taken the frame before that, so a paused encoder costs one wait. A wait
+  // that runs out rests the waiting for `rest`: the congestion window drops
+  // a frame in every few, each of which would cost a whole wait.
+  void WaitForPrevious(uint64_t sequence_number,
+                       std::chrono::microseconds most,
+                       std::chrono::microseconds rest);
+
+  // The chain broke before the pass-through encoder: a frame, or several in a
+  // row, never reached it, and the deltas after were held until a keyframe.
+  void ChainBroken();
+  // Returns and clears the chain breaks counted since the last call.
+  uint32_t TakeChainBreaks();
+
+ private:
+  std::mutex mutex_;
+  std::condition_variable taken_;
+  bool any_taken_ = false;
+  uint64_t last_taken_ = 0;
+  std::chrono::steady_clock::time_point rest_until_;
+  uint32_t chain_breaks_ = 0;
+};
+
 // A native WebRTC frame buffer carrying one encoded video access unit.
 class EncodedVideoFrameBuffer : public webrtc::VideoFrameBuffer {
  public:
@@ -71,7 +111,8 @@ class EncodedVideoFrameBuffer : public webrtc::VideoFrameBuffer {
       EncodedFrameType frame_type,
       webrtc::scoped_refptr<webrtc::EncodedImageBufferInterface> payload,
       std::shared_ptr<std::atomic<bool>> keyframe_request_flag = nullptr,
-      std::shared_ptr<EncodedRateControlState> rate_control_state = nullptr);
+      std::shared_ptr<EncodedRateControlState> rate_control_state = nullptr,
+      std::shared_ptr<EncodedHandover> handover = nullptr);
   ~EncodedVideoFrameBuffer() override = default;
 
   Type type() const override;
@@ -115,6 +156,11 @@ class EncodedVideoFrameBuffer : public webrtc::VideoFrameBuffer {
   void set_rate_control_request(uint64_t target_bitrate_bps,
                                 double framerate_fps) const;
 
+  // RIFT PATCH: tells the source the pass-through encoder took this frame.
+  void taken() const;
+  // Tells the source this frame follows one that never reached the encoder.
+  void chain_broken() const;
+
   static EncodedVideoFrameBuffer* FromNative(webrtc::VideoFrameBuffer* buffer);
 
  private:
@@ -125,6 +171,7 @@ class EncodedVideoFrameBuffer : public webrtc::VideoFrameBuffer {
   webrtc::scoped_refptr<webrtc::EncodedImageBufferInterface> payload_;
   std::shared_ptr<std::atomic<bool>> keyframe_request_flag_;
   std::shared_ptr<EncodedRateControlState> rate_control_state_;
+  std::shared_ptr<EncodedHandover> handover_;
   const void* stream_id_ = nullptr;
   uint64_t sequence_number_ = 0;
 };
