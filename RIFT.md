@@ -141,6 +141,14 @@ needs. Everything else is upstream, unchanged.
     `NativeVideoSource::take_chain_repair_request` while it holds deltas,
     which cannot wait (Nov 19 2026).
 
+12. **`livekit`: a screen share's start bitrate hint is capped like a
+    camera's**, at 1 Mbps and lower after a slow connection setup. Upstream
+    leaves a screen share at 90% of its cap, so a 20 Mbps share opened at an
+    18 Mbps estimate and probed above it, and an upload under that spent its
+    first seconds losing packets (a review of a friend's game share, Nov 18
+    2026). On a fast link it costs nothing: a 12 Mbps H264 share reached its
+    cap in 14 s either way (local server, Nov 19 2026).
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was

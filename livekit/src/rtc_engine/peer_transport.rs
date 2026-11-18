@@ -37,8 +37,8 @@ struct TransportInner {
     single_pc_mode: bool,
     // Publish-side target bitrate (bps) for offer munging
     max_send_bitrate_bps: Option<u64>,
-    // Whether the target above belongs to a screen share, which is exempt from the
-    // start bitrate cap.
+    // Whether the target above belongs to a screen share. RIFT PATCH: no longer exempt from
+    // the start bitrate cap (see `compute_start_bitrate_kbps`).
     max_send_bitrate_is_screen_share: bool,
     // How long this peer connection took to set up, set once the initial connect succeeds.
     // `compute_start_bitrate_kbps` lowers the hint for slow connections.
@@ -296,9 +296,14 @@ impl PeerTransport {
     ///
     /// 90% of the target leaves ~10% headroom for the estimator to settle. The same
     /// multiplier is used for every codec because the target already reflects the codec's
-    /// efficiency. Camera is capped at [`Self::MAX_START_BITRATE_KBPS`] so the estimator does
-    /// not open too aggressively on a high-bitrate track; screen share is exempt, because its
-    /// content needs the bitrate immediately to stay legible.
+    /// efficiency. It is capped at [`Self::MAX_START_BITRATE_KBPS`] so the estimator does
+    /// not open too aggressively on a high-bitrate track.
+    ///
+    /// RIFT PATCH: screen share is capped too. Upstream exempts it, so that its content is
+    /// legible at once, but a 20 Mbps share then opened at an 18 Mbps estimate and probed
+    /// above it, and an upload under that spent its first seconds losing packets while the
+    /// estimate collapsed (a friend's RDR2 share, Nov 18 2026). 1 Mbps climbed to a share's
+    /// rate as fast on a fast link as hints of 3 to 9.9 Mbps did (H265, Intel, Nov 8 2026).
     ///
     /// Connection setup time (signaling join plus ICE/DTLS) is the only network signal there
     /// is before the first video offer, since libwebrtc cannot probe the path until a video
@@ -306,14 +311,14 @@ impl PeerTransport {
     /// a 1 Mbps seed overshoots, so the cap ramps linearly from
     /// [`Self::MAX_START_BITRATE_KBPS`] at [`Self::SETUP_TIME_FOR_MAX_BITRATE`] down to
     /// [`Self::MIN_TARGET_BITRATE_KBPS`] at [`Self::SETUP_TIME_FOR_MIN_BITRATE`]. Screen
-    /// share is exempt from this ramp as well, however slow the setup. Without a setup time
+    /// share follows the ramp too (RIFT PATCH). Without a setup time
     /// (an offer before the initial connect completed) the cap stays at the 1 Mbps ceiling.
     ///
     /// Returns None if no target bitrate is set (initial offer before track publish) or if
     /// the target is below [`Self::MIN_TARGET_BITRATE_KBPS`].
     fn compute_start_bitrate_kbps(
         target_bps: Option<u64>,
-        is_screen_share: bool,
+        _is_screen_share: bool,
         setup_time: Option<Duration>,
     ) -> Option<u32> {
         let target_bps = target_bps?;
@@ -335,11 +340,7 @@ impl PeerTransport {
         };
 
         let start_kbps = ((target_kbps as f64 * 0.9).round() as u32).min(target_kbps);
-        if is_screen_share {
-            Some(start_kbps)
-        } else {
-            Some(start_kbps.min(cap_kbps))
-        }
+        Some(start_kbps.min(cap_kbps))
     }
 
     /// Munge SDP to add stereo=1 to opus audio fmtp lines for single PC mode
@@ -840,7 +841,7 @@ a=fmtp:111 minptime=10;useinbandfec=1\n";
     }
 
     #[test]
-    fn start_bitrate_caps_camera_but_not_screen_share() {
+    fn start_bitrate_caps_camera_and_screen_share() {
         // 90% of 3 Mbps is 2700, above the 1 Mbps camera ceiling.
         assert_eq!(
             PeerTransport::compute_start_bitrate_kbps(Some(3_000_000), false, None),
@@ -849,8 +850,13 @@ a=fmtp:111 minptime=10;useinbandfec=1\n";
         );
         assert_eq!(
             PeerTransport::compute_start_bitrate_kbps(Some(3_000_000), true, None),
-            Some(2700),
-            "screen share should not be capped; its content needs the bitrate to stay legible"
+            Some(PeerTransport::MAX_START_BITRATE_KBPS),
+            "screen share is capped as well (RIFT PATCH)"
+        );
+        assert_eq!(
+            PeerTransport::compute_start_bitrate_kbps(Some(20_000_000), true, None),
+            Some(PeerTransport::MAX_START_BITRATE_KBPS),
+            "a 20 Mbps share no longer opens at 18 Mbps"
         );
     }
 
@@ -915,7 +921,7 @@ a=fmtp:111 minptime=10;useinbandfec=1\n";
     }
 
     #[test]
-    fn slow_connection_setup_leaves_screen_share_uncapped() {
+    fn slow_connection_setup_lowers_screen_share_too() {
         let screen_share = |ms| {
             PeerTransport::compute_start_bitrate_kbps(
                 Some(3_000_000),
@@ -923,9 +929,9 @@ a=fmtp:111 minptime=10;useinbandfec=1\n";
                 Some(Duration::from_millis(ms)),
             )
         };
-        assert_eq!(screen_share(1273), Some(2700), "a fast setup");
-        assert_eq!(screen_share(2500), Some(2700), "mid-ramp");
-        assert_eq!(screen_share(4061), Some(2700), "past the slow anchor");
+        assert_eq!(screen_share(1273), Some(1000), "a fast setup");
+        assert_eq!(screen_share(2500), Some(650), "mid-ramp");
+        assert_eq!(screen_share(4061), Some(300), "past the slow anchor");
     }
 
     #[test]
