@@ -162,6 +162,9 @@ class VideoTrackSource {
   // RIFT PATCH: returns and clears how many times the chain of encoded
   // frames broke before the pass-through encoder (EncodedHandover).
   uint32_t take_chain_breaks() const;
+  // RIFT PATCH: returns and clears whether a keyframe is wanted to mend the
+  // chain. A keyframe request (take_keyframe_request) is raised with it.
+  bool take_chain_repair_request() const;
 
   void set_packet_trailer_handler(
       std::shared_ptr<PacketTrailerHandler> handler) const;

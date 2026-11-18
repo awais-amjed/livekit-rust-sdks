@@ -168,6 +168,13 @@ void EncodedVideoFrameBuffer::chain_broken() const {
   }
 }
 
+void EncodedVideoFrameBuffer::repair_chain() const {
+  if (handover_) {
+    handover_->RepairWanted();
+  }
+  request_keyframe();
+}
+
 EncodedVideoFrameBuffer* EncodedVideoFrameBuffer::FromNative(
     webrtc::VideoFrameBuffer* buffer) {
   if (!buffer || buffer->type() != webrtc::VideoFrameBuffer::Type::kNative) {

@@ -260,7 +260,8 @@ class PassthroughVideoEncoder final : public VideoEncoder {
     }
 
     if (!ContinuesChain(*encoded_buffer, is_keyframe)) {
-      encoded_buffer->request_keyframe();
+      // RIFT PATCH: apart from a viewer's request, as this one cannot wait.
+      encoded_buffer->repair_chain();
       encoded_image_callback_->OnFrameDropped(frame.rtp_timestamp(),
                                               /*spatial_id=*/0,
                                               /*is_end_of_temporal_unit=*/true);
@@ -533,7 +534,10 @@ rust::Vec<uint8_t> passthrough_chain_guard_for_test(
                            .set_rtp_timestamp(rtp_timestamp += 3000)
                            .build();
     const int sent_before = callback.sent;
-    encoder.Encode(frame, nullptr);
+    const std::vector<VideoFrameType> key_asked = {
+        VideoFrameType::kVideoFrameKey};
+    encoder.Encode(frame,
+                   kind == kChainTestDeltaKeyAsked ? &key_asked : nullptr);
     uint8_t result = 0;
     if (callback.sent > sent_before) {
       result |= kChainTestSent;
@@ -543,6 +547,9 @@ rust::Vec<uint8_t> passthrough_chain_guard_for_test(
     }
     if (handover->TakeChainBreaks() > 0) {
       result |= kChainTestChainBroken;
+    }
+    if (handover->TakeRepair()) {
+      result |= kChainTestRepairRequested;
     }
     results.push_back(result);
   }

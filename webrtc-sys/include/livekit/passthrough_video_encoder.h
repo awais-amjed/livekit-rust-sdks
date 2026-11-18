@@ -53,10 +53,13 @@ class PassthroughVideoEncoderFactory : public webrtc::VideoEncoderFactory {
 constexpr uint8_t kChainTestKey = 0;
 constexpr uint8_t kChainTestDelta = 1;
 constexpr uint8_t kChainTestDroppedBeforeEncoder = 2;
+// A delta frame that WebRTC wants as a keyframe, as after a viewer's PLI.
+constexpr uint8_t kChainTestDeltaKeyAsked = 3;
 // Result bits, one result per frame that reached the encoder.
 constexpr uint8_t kChainTestSent = 1;
 constexpr uint8_t kChainTestKeyframeRequested = 2;
 constexpr uint8_t kChainTestChainBroken = 4;
+constexpr uint8_t kChainTestRepairRequested = 8;
 
 // Feeds a frame sequence through a PassthroughVideoEncoder.
 rust::Vec<uint8_t> passthrough_chain_guard_for_test(

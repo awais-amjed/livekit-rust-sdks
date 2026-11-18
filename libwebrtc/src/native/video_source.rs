@@ -237,6 +237,13 @@ impl NativeVideoSource {
         self.sys_handle.take_chain_breaks()
     }
 
+    /// RIFT PATCH: returns and clears whether the pass-through encoder is
+    /// holding frames until a keyframe, which cannot wait, unlike a keyframe a
+    /// viewer asked for.
+    pub fn take_chain_repair_request(&self) -> bool {
+        self.sys_handle.take_chain_repair_request()
+    }
+
     /// Set the packet trailer handler used by this source.
     ///
     /// When set, any frame captured with a `user_timestamp` value will

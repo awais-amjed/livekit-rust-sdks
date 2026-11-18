@@ -129,6 +129,7 @@ pub mod ffi {
         fn take_keyframe_request(self: &VideoTrackSource) -> bool;
         fn take_rate_control_request(self: &VideoTrackSource) -> EncodedRateControlRequest;
         fn take_chain_breaks(self: &VideoTrackSource) -> u32;
+        fn take_chain_repair_request(self: &VideoTrackSource) -> bool;
         fn set_packet_trailer_handler(
             self: &VideoTrackSource,
             handler: SharedPtr<PacketTrailerHandler>,
@@ -207,9 +208,11 @@ mod tests {
     const KEY: u8 = 0;
     const DELTA: u8 = 1;
     const DROPPED: u8 = 2;
+    const DELTA_KEY_ASKED: u8 = 3;
     const SENT: u8 = 1;
     const KEY_REQUESTED: u8 = 2;
     const BROKEN: u8 = 4;
+    const REPAIR: u8 = 8;
 
     /// Delta frames after a frame dropped before the encoder are held, with a
     /// keyframe request, until the next keyframe restores the chain.
@@ -218,14 +221,33 @@ mod tests {
         let results = ffi_tests::passthrough_chain_guard_for_test(&[
             KEY, DELTA, DROPPED, DELTA, DELTA, KEY, DELTA,
         ]);
-        assert_eq!(results, [SENT, SENT, KEY_REQUESTED | BROKEN, KEY_REQUESTED, SENT, SENT],);
+        assert_eq!(
+            results,
+            [
+                SENT,
+                SENT,
+                KEY_REQUESTED | BROKEN | REPAIR,
+                KEY_REQUESTED | REPAIR,
+                SENT,
+                SENT
+            ],
+        );
+    }
+
+    /// A keyframe WebRTC wants for a viewer is asked for, but is not a repair:
+    /// the frame is sent, and the capture side may space such requests out.
+    #[test]
+    fn a_viewers_keyframe_request_is_not_a_repair() {
+        let results =
+            ffi_tests::passthrough_chain_guard_for_test(&[KEY, DELTA_KEY_ASKED, DELTA]);
+        assert_eq!(results, [SENT, SENT | KEY_REQUESTED, SENT]);
     }
 
     /// Delta frames before the first keyframe cannot be decoded and are held.
     #[test]
     fn passthrough_waits_for_first_keyframe() {
         let results = ffi_tests::passthrough_chain_guard_for_test(&[DELTA, KEY, DELTA]);
-        assert_eq!(results, [KEY_REQUESTED, SENT, SENT]);
+        assert_eq!(results, [KEY_REQUESTED | REPAIR, SENT, SENT]);
     }
 
     /// A source waits for the encoder to take the frame before, only while the

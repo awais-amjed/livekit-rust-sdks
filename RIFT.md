@@ -133,6 +133,14 @@ needs. Everything else is upstream, unchanged.
     every few (`EncodedHandover`). The times the chain broke before the
     encoder are counted (`NativeVideoSource::take_chain_breaks`).
 
+11. **`webrtc-sys`: a keyframe to mend the chain is told apart from one a
+    viewer asked for.** Both raised the same request, so a capture side that
+    spaced out viewers' requests, to keep one viewer losing packets from
+    making keyframes for everyone, would have held back the keyframe that
+    every viewer was waiting for. The pass-through encoder now also raises
+    `NativeVideoSource::take_chain_repair_request` while it holds deltas,
+    which cannot wait (Nov 19 2026).
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was

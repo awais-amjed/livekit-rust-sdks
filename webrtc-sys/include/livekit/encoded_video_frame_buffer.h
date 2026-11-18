@@ -66,8 +66,10 @@ class EncodedRateControlState {
 // ("encoder blocked"), which costs raw frames nothing. A pre-encoded delta
 // frame needs every frame before it, so each drop breaks the chain until a
 // keyframe. A source therefore waits, briefly, for the encoder to take a
-// frame before handing over the next. Also counts the frames that never
-// reached the encoder, for the capture side to log.
+// frame before handing over the next. Also counts the chain breaks, for the
+// capture side to log, and says when a keyframe is wanted to mend one, which
+// must go at once, apart from the keyframes viewers ask for, which the
+// capture side may space out.
 class EncodedHandover {
  public:
   // The pass-through encoder took frame `sequence_number`.
@@ -88,6 +90,13 @@ class EncodedHandover {
   // Returns and clears the chain breaks counted since the last call.
   uint32_t TakeChainBreaks();
 
+  // The pass-through encoder is holding deltas until a keyframe.
+  void RepairWanted() { repair_wanted_.store(true, std::memory_order_relaxed); }
+  // Returns and clears whether a keyframe is wanted to mend the chain.
+  bool TakeRepair() {
+    return repair_wanted_.exchange(false, std::memory_order_relaxed);
+  }
+
  private:
   std::mutex mutex_;
   std::condition_variable taken_;
@@ -95,6 +104,7 @@ class EncodedHandover {
   uint64_t last_taken_ = 0;
   std::chrono::steady_clock::time_point rest_until_;
   uint32_t chain_breaks_ = 0;
+  std::atomic<bool> repair_wanted_{false};
 };
 
 // A native WebRTC frame buffer carrying one encoded video access unit.
@@ -160,6 +170,9 @@ class EncodedVideoFrameBuffer : public webrtc::VideoFrameBuffer {
   void taken() const;
   // Tells the source this frame follows one that never reached the encoder.
   void chain_broken() const;
+  // Asks the capture side for a keyframe to mend the chain: this frame is
+  // held, as is every delta until one comes. Sets the keyframe request too.
+  void repair_chain() const;
 
   static EncodedVideoFrameBuffer* FromNative(webrtc::VideoFrameBuffer* buffer);
 

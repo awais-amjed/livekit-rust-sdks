@@ -181,6 +181,14 @@ pub mod native {
             self.handle.take_chain_breaks()
         }
 
+        /// RIFT PATCH: returns and clears whether the pass-through encoder is
+        /// holding frames until a keyframe. Such a request cannot wait, unlike
+        /// one a viewer made; [`Self::take_keyframe_request`] is raised with
+        /// it.
+        pub fn take_chain_repair_request(&self) -> bool {
+            self.handle.take_chain_repair_request()
+        }
+
         /// Set the packet trailer handler used by this source.
         ///
         /// When set, any frame captured with a `user_timestamp` value will

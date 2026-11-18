@@ -337,6 +337,10 @@ uint32_t VideoTrackSource::take_chain_breaks() const {
   return source_->handover()->TakeChainBreaks();
 }
 
+bool VideoTrackSource::take_chain_repair_request() const {
+  return source_->handover()->TakeRepair();
+}
+
 void VideoTrackSource::set_packet_trailer_handler(
     std::shared_ptr<PacketTrailerHandler> handler) const {
   source_->set_packet_trailer_handler(std::move(handler));
