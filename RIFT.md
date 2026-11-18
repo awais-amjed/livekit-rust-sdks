@@ -167,7 +167,8 @@ needs. Everything else is upstream, unchanged.
     sent none, so it heard a recovered estimate only when its encoder repeated
     a picture, up to a second later (a review of a game share, Nov 18 2026).
     The encoder now keeps the source's rate mailbox from the first frame and
-    writes each rate to it as it is set (Nov 19 2026).
+    writes each rate to it as it is set, and hands the last rate to a source
+    whose frames it starts to get (Nov 19 2026).
 
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more

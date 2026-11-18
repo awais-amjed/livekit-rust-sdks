@@ -66,8 +66,8 @@ rust::Vec<uint8_t> passthrough_chain_guard_for_test(
     rust::Slice<const uint8_t> frames);
 
 // RIFT PATCH: what a source's rate mailbox holds after a rate set before any
-// frame, after the first frame, after a rate set between frames, and once
-// taken (0 where it holds none).
+// frame, after the first frame, after a rate set between frames, once taken,
+// and a second source's once its first frame came (0 where it holds none).
 rust::Vec<uint64_t> passthrough_rates_for_test();
 #endif
 

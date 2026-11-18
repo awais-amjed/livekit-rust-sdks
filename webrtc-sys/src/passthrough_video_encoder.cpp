@@ -346,14 +346,13 @@ class PassthroughVideoEncoder final : public VideoEncoder {
   // within the old, lower rate sent none: it heard a recovered estimate only
   // when its encoder repeated a picture, up to a second later.
   void SetRates(const RateControlParameters& parameters) override {
-    const uint64_t bitrate_bps = parameters.bitrate.get_sum_bps();
     webrtc::MutexLock lock(&rate_control_mutex_);
+    last_rate_ = livekit::EncodedRateControlRequest{
+        true, parameters.bitrate.get_sum_bps(), parameters.framerate_fps};
     if (rate_control_state_) {
-      rate_control_state_->Store(bitrate_bps, parameters.framerate_fps);
-      return;
+      rate_control_state_->Store(last_rate_->target_bitrate_bps,
+                                 last_rate_->framerate_fps);
     }
-    latest_rate_control_request_ = livekit::EncodedRateControlRequest{
-        true, bitrate_bps, parameters.framerate_fps};
   }
 
   EncoderInfo GetEncoderInfo() const override {
@@ -394,16 +393,21 @@ class PassthroughVideoEncoder final : public VideoEncoder {
   }
 
   // Learns the source's rate mailbox from its frame (RIFT PATCH, see
-  // SetRates), and hands over a rate set before any frame came.
+  // SetRates). A new one, the first frame's or another source's, is handed
+  // the last rate: one set before it came, or set when the frames moved to
+  // it, would otherwise reach it only with the next change.
   void ForwardPendingRateControl(
       EncodedVideoFrameBuffer* encoded_buffer) {
     webrtc::MutexLock lock(&rate_control_mutex_);
-    rate_control_state_ = encoded_buffer->rate_control_state();
-    if (latest_rate_control_request_.has_value()) {
-      encoded_buffer->set_rate_control_request(
-          latest_rate_control_request_->target_bitrate_bps,
-          latest_rate_control_request_->framerate_fps);
-      latest_rate_control_request_.reset();
+    std::shared_ptr<livekit::EncodedRateControlState> state =
+        encoded_buffer->rate_control_state();
+    if (state == rate_control_state_) {
+      return;
+    }
+    rate_control_state_ = std::move(state);
+    if (rate_control_state_ && last_rate_.has_value()) {
+      rate_control_state_->Store(last_rate_->target_bitrate_bps,
+                                 last_rate_->framerate_fps);
     }
   }
 
@@ -415,8 +419,9 @@ class PassthroughVideoEncoder final : public VideoEncoder {
   ScalableVideoControllerNoLayering av1_svc_controller_;
   std::vector<uint8_t> cached_sequence_header_obu_;
   webrtc::Mutex rate_control_mutex_;
-  std::optional<livekit::EncodedRateControlRequest> latest_rate_control_request_;
-  // The mailbox of the source the last frame came from (RIFT PATCH).
+  // RIFT PATCH: the last rate set, and the mailbox of the source the last
+  // frame came from.
+  std::optional<livekit::EncodedRateControlRequest> last_rate_;
   std::shared_ptr<livekit::EncodedRateControlState> rate_control_state_;
   // Reference-chain state, see ContinuesChain(). Starts broken so the first
   // frame sent is a keyframe.
@@ -609,6 +614,20 @@ rust::Vec<uint64_t> passthrough_rates_for_test() {
   take();
   set_rate(3000000);
   take();
+  take();
+  // The frames move to another source: it hears the last rate.
+  auto other_rates = std::make_shared<livekit::EncodedRateControlState>();
+  auto other = webrtc::make_ref_counted<EncodedVideoFrameBuffer>(
+      64, 64, livekit::EncodedVideoCodec::kH264, livekit::EncodedFrameType::kKey,
+      EncodedImageBuffer::Create(payload, sizeof(payload)), nullptr,
+      other_rates, nullptr);
+  other->set_stream_position(&other_rates, 0);
+  encoder.Encode(VideoFrame::Builder()
+                     .set_video_frame_buffer(other)
+                     .set_rtp_timestamp(6000)
+                     .build(),
+                 nullptr);
+  rates = other_rates;
   take();
   return results;
 }

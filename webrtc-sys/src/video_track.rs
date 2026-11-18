@@ -246,10 +246,14 @@ mod tests {
     }
 
     /// A rate set before any frame waits for the first, which says whose it
-    /// is; one set between frames reaches the source at once, without one.
+    /// is; one set between frames reaches the source at once, without one;
+    /// and frames from another source bring it the last rate.
     #[test]
     fn a_rate_set_between_frames_reaches_the_source() {
-        assert_eq!(ffi_tests::passthrough_rates_for_test(), [0, 1_000_000, 3_000_000, 0]);
+        assert_eq!(
+            ffi_tests::passthrough_rates_for_test(),
+            [0, 1_000_000, 3_000_000, 0, 3_000_000]
+        );
     }
 
     /// Delta frames before the first keyframe cannot be decoded and are held.
