@@ -169,10 +169,13 @@ void EncodedVideoFrameBuffer::chain_broken() const {
 }
 
 void EncodedVideoFrameBuffer::repair_chain() const {
+  // The plain request first: a capture side taking the repair flag and then
+  // the plain one never finds the plain one left over from a repair it took,
+  // and at worst hears the repair one poll late.
+  request_keyframe();
   if (handover_) {
     handover_->RepairWanted();
   }
-  request_keyframe();
 }
 
 EncodedVideoFrameBuffer* EncodedVideoFrameBuffer::FromNative(
