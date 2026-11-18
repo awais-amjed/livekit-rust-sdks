@@ -718,7 +718,7 @@ mod loopback_tests {
 
         // `offer_to_receive_video: false` would strip the receive direction
         // from every video transceiver (`sdp_offer_answer.cc`).
-        let options = OfferOptions { offer_to_receive_video: true, ..Default::default() };
+        let options = OfferOptions { offer_to_receive_video: Some(true), ..Default::default() };
         let offer = offerer.create_offer(options).await.unwrap();
         offerer.set_local_description(offer.clone()).await.unwrap();
         answerer.set_remote_description(offer).await.unwrap();
