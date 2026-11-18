@@ -196,6 +196,8 @@ mod tests {
 
             fn passthrough_chain_guard_for_test(frames: &[u8]) -> Vec<u8>;
 
+            fn passthrough_rates_for_test() -> Vec<u64>;
+
             include!("livekit/video_track.h");
 
             fn encoded_capture_order_for_test(threads: u32, frames_per_thread: u32) -> Vec<u64>;
@@ -241,6 +243,13 @@ mod tests {
         let results =
             ffi_tests::passthrough_chain_guard_for_test(&[KEY, DELTA_KEY_ASKED, DELTA]);
         assert_eq!(results, [SENT, SENT | KEY_REQUESTED, SENT]);
+    }
+
+    /// A rate set before any frame waits for the first, which says whose it
+    /// is; one set between frames reaches the source at once, without one.
+    #[test]
+    fn a_rate_set_between_frames_reaches_the_source() {
+        assert_eq!(ffi_tests::passthrough_rates_for_test(), [0, 1_000_000, 3_000_000, 0]);
     }
 
     /// Delta frames before the first keyframe cannot be decoded and are held.

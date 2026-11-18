@@ -340,10 +340,20 @@ class PassthroughVideoEncoder final : public VideoEncoder {
     return WEBRTC_VIDEO_CODEC_OK;
   }
 
+  // RIFT PATCH: straight to the source once a frame has said which it is.
+  // Handed over inside Encode() alone, a rate reached the capture side only
+  // with the next frame, and a capture side holding frames back to keep
+  // within the old, lower rate sent none: it heard a recovered estimate only
+  // when its encoder repeated a picture, up to a second later.
   void SetRates(const RateControlParameters& parameters) override {
+    const uint64_t bitrate_bps = parameters.bitrate.get_sum_bps();
     webrtc::MutexLock lock(&rate_control_mutex_);
+    if (rate_control_state_) {
+      rate_control_state_->Store(bitrate_bps, parameters.framerate_fps);
+      return;
+    }
     latest_rate_control_request_ = livekit::EncodedRateControlRequest{
-        true, parameters.bitrate.get_sum_bps(), parameters.framerate_fps};
+        true, bitrate_bps, parameters.framerate_fps};
   }
 
   EncoderInfo GetEncoderInfo() const override {
@@ -383,17 +393,17 @@ class PassthroughVideoEncoder final : public VideoEncoder {
     return chain_intact_;
   }
 
+  // Learns the source's rate mailbox from its frame (RIFT PATCH, see
+  // SetRates), and hands over a rate set before any frame came.
   void ForwardPendingRateControl(
       EncodedVideoFrameBuffer* encoded_buffer) {
-    std::optional<livekit::EncodedRateControlRequest> request;
-    {
-      webrtc::MutexLock lock(&rate_control_mutex_);
-      request = latest_rate_control_request_;
+    webrtc::MutexLock lock(&rate_control_mutex_);
+    rate_control_state_ = encoded_buffer->rate_control_state();
+    if (latest_rate_control_request_.has_value()) {
+      encoded_buffer->set_rate_control_request(
+          latest_rate_control_request_->target_bitrate_bps,
+          latest_rate_control_request_->framerate_fps);
       latest_rate_control_request_.reset();
-    }
-    if (request.has_value()) {
-      encoded_buffer->set_rate_control_request(request->target_bitrate_bps,
-                                               request->framerate_fps);
     }
   }
 
@@ -406,6 +416,8 @@ class PassthroughVideoEncoder final : public VideoEncoder {
   std::vector<uint8_t> cached_sequence_header_obu_;
   webrtc::Mutex rate_control_mutex_;
   std::optional<livekit::EncodedRateControlRequest> latest_rate_control_request_;
+  // The mailbox of the source the last frame came from (RIFT PATCH).
+  std::shared_ptr<livekit::EncodedRateControlState> rate_control_state_;
   // Reference-chain state, see ContinuesChain(). Starts broken so the first
   // frame sent is a keyframe.
   bool chain_intact_ = false;
@@ -553,6 +565,51 @@ rust::Vec<uint8_t> passthrough_chain_guard_for_test(
     }
     results.push_back(result);
   }
+  return results;
+}
+
+rust::Vec<uint64_t> passthrough_rates_for_test() {
+  PassthroughVideoEncoder encoder(webrtc::CreateEnvironment(),
+                                  SdpVideoFormat("H264"));
+  VideoCodec codec;
+  codec.codecType = webrtc::kVideoCodecH264;
+  codec.width = 64;
+  codec.height = 64;
+  encoder.InitEncode(
+      &codec, VideoEncoder::Settings(VideoEncoder::Capabilities(false), 1, 0));
+  RecordingCallback callback;
+  encoder.RegisterEncodeCompleteCallback(&callback);
+
+  auto rates = std::make_shared<livekit::EncodedRateControlState>();
+  auto set_rate = [&](uint32_t bps) {
+    webrtc::VideoBitrateAllocation allocation;
+    allocation.SetBitrate(0, 0, bps);
+    encoder.SetRates(VideoEncoder::RateControlParameters(allocation, 30.0));
+  };
+  rust::Vec<uint64_t> results;
+  auto take = [&] {
+    livekit::EncodedRateControlRequest request = rates->Take();
+    results.push_back(request.has_request ? request.target_bitrate_bps : 0);
+  };
+
+  set_rate(1000000);
+  take();
+  const uint8_t stream = 0;
+  const uint8_t payload[] = {0, 0, 0, 1, 0x65, 0x88};
+  auto buffer = webrtc::make_ref_counted<EncodedVideoFrameBuffer>(
+      64, 64, livekit::EncodedVideoCodec::kH264, livekit::EncodedFrameType::kKey,
+      EncodedImageBuffer::Create(payload, sizeof(payload)), nullptr, rates,
+      nullptr);
+  buffer->set_stream_position(&stream, 0);
+  encoder.Encode(VideoFrame::Builder()
+                     .set_video_frame_buffer(buffer)
+                     .set_rtp_timestamp(3000)
+                     .build(),
+                 nullptr);
+  take();
+  set_rate(3000000);
+  take();
+  take();
   return results;
 }
 #endif

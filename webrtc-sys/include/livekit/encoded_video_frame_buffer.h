@@ -165,6 +165,11 @@ class EncodedVideoFrameBuffer : public webrtc::VideoFrameBuffer {
   // Updates the capture side with the latest encoder rate-control target.
   void set_rate_control_request(uint64_t target_bitrate_bps,
                                 double framerate_fps) const;
+  // RIFT PATCH: the source's rate mailbox, for the pass-through encoder to
+  // keep, so a rate set between frames reaches the source at once.
+  std::shared_ptr<EncodedRateControlState> rate_control_state() const {
+    return rate_control_state_;
+  }
 
   // RIFT PATCH: tells the source the pass-through encoder took this frame.
   void taken() const;
