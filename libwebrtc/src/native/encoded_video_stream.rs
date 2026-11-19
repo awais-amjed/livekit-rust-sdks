@@ -49,6 +49,12 @@ pub struct NativeEncodedVideoStreamOptions {
     /// frames instead would leave later frames referencing ones the reader
     /// never saw.
     pub max_pending_frames: Option<usize>,
+    /// With it set, a flushed backlog does not ask for a keyframe: the reader
+    /// does, when it wants one, seeing [`ReceivedEncodedFrame::after_flush`].
+    /// A reader that keeps falling behind can then ask less often, since the
+    /// keyframe goes to every viewer of the stream and the reader would only
+    /// fall behind again. A gap in what arrives still asks at once.
+    pub reader_asks_after_flush: bool,
 }
 
 /// One encoded access unit received through a pass-through decoder.
@@ -73,8 +79,12 @@ pub struct ReceivedEncodedFrame {
     /// `true` when an earlier access unit this one may depend on was not
     /// delivered (a gap, a new decoder, or a flushed backlog) and no keyframe
     /// has arrived since. Such frames may not decode correctly; a keyframe has
-    /// already been requested.
+    /// already been requested, unless only a flushed backlog broke the chain
+    /// and [`NativeEncodedVideoStreamOptions::reader_asks_after_flush`] is set.
     pub after_gap: bool,
+    /// `true` on the frame whose arrival flushed the backlog: the reader fell
+    /// [`NativeEncodedVideoStreamOptions::max_pending_frames`] behind.
+    pub after_flush: bool,
     buffer: BoxVideoBuffer,
 }
 
@@ -88,6 +98,7 @@ impl std::fmt::Debug for ReceivedEncodedFrame {
             .field("rtp_timestamp", &self.rtp_timestamp)
             .field("sequence", &self.sequence)
             .field("after_gap", &self.after_gap)
+            .field("after_flush", &self.after_flush)
             .field("payload_len", &self.payload().len())
             .finish()
     }
@@ -131,7 +142,7 @@ impl NativeEncodedVideoStream {
         let queue = Arc::new(EncodedFrameQueue::new(options.max_pending_frames));
         let observer = Arc::new(EncodedTrackObserver {
             queue: Arc::downgrade(&queue),
-            gaps: Mutex::new(GapTracker::default()),
+            gaps: Mutex::new(GapTracker::new(!options.reader_asks_after_flush)),
         });
         #[cfg(test)]
         let weak_observer = Arc::downgrade(&observer);
@@ -199,7 +210,7 @@ impl sys_vt::VideoSink for EncodedTrackObserver {
             (encoded.codec, encoded.frame_type, encoded.stream_id, encoded.sequence);
         let keyframe = frame_type == EncodedFrameType::Key;
 
-        admit(&queue, &self.gaps, stream_id, sequence, keyframe, |verdict| {
+        admit(&queue, &self.gaps, stream_id, sequence, keyframe, |verdict, flushed| {
             let received = ReceivedEncodedFrame {
                 codec,
                 frame_type,
@@ -210,6 +221,7 @@ impl sys_vt::VideoSink for EncodedTrackObserver {
                 timestamp_us: frame.timestamp_us(),
                 sequence,
                 after_gap: verdict.after_gap,
+                after_flush: flushed,
                 buffer,
             };
             if verdict.request_keyframe {
@@ -234,9 +246,11 @@ fn admit<T>(
     stream_id: usize,
     sequence: u64,
     keyframe: bool,
-    make: impl FnOnce(GapVerdict) -> T,
+    make: impl FnOnce(GapVerdict, bool) -> T,
 ) {
-    queue.push_with(|flushed| make(gaps.lock().observe(stream_id, sequence, keyframe, flushed)));
+    queue.push_with(|flushed| {
+        make(gaps.lock().observe(stream_id, sequence, keyframe, flushed), flushed)
+    });
 }
 
 /// What [`GapTracker::observe`] decided for one frame.
@@ -250,14 +264,20 @@ struct GapVerdict {
 ///
 /// The chain is broken by a missing sequence number, a new decoder (a new
 /// stream id), a flushed backlog, or a stream that starts on a delta frame. A
-/// keyframe restores it. A keyframe is requested once per break.
-#[derive(Debug, Default)]
+/// keyframe restores it. A keyframe is requested once per break, but for a
+/// flushed backlog only if [`Self::ask_after_flush`].
+#[derive(Debug)]
 struct GapTracker {
     last: Option<(usize, u64)>,
     broken: bool,
+    ask_after_flush: bool,
 }
 
 impl GapTracker {
+    fn new(ask_after_flush: bool) -> Self {
+        Self { last: None, broken: false, ask_after_flush }
+    }
+
     fn observe(
         &mut self,
         stream_id: usize,
@@ -276,7 +296,8 @@ impl GapTracker {
             return GapVerdict { after_gap: false, request_keyframe: false };
         }
         let breaks = !continuous || flushed;
-        let request_keyframe = breaks && !self.broken;
+        let asks = !continuous || self.ask_after_flush;
+        let request_keyframe = breaks && asks && !self.broken;
         self.broken |= breaks;
         GapVerdict { after_gap: self.broken, request_keyframe }
     }
@@ -399,7 +420,7 @@ mod tests {
 
     #[test]
     fn gap_marks_frames_until_keyframe_and_requests_once() {
-        let mut t = GapTracker::default();
+        let mut t = GapTracker::new(true);
         let s = 7;
         assert_eq!(t.observe(s, 0, true, false), OK);
         assert_eq!(t.observe(s, 1, false, false), OK);
@@ -411,7 +432,7 @@ mod tests {
 
     #[test]
     fn stream_waits_for_first_keyframe() {
-        let mut t = GapTracker::default();
+        let mut t = GapTracker::new(true);
         assert_eq!(t.observe(1, 0, false, false), GAP_REQUEST);
         assert_eq!(t.observe(1, 1, false, false), GAP_HELD);
         assert_eq!(t.observe(1, 2, true, false), OK);
@@ -419,7 +440,7 @@ mod tests {
 
     #[test]
     fn new_stream_identity_restarts_sequence_without_false_gap() {
-        let mut t = GapTracker::default();
+        let mut t = GapTracker::new(true);
         assert_eq!(t.observe(1, 0, true, false), OK);
         assert_eq!(t.observe(1, 1, false, false), OK);
         // A new decoder (codec switch) starts at 0 with a keyframe: no gap.
@@ -433,34 +454,49 @@ mod tests {
     #[test]
     fn frame_that_flushes_the_backlog_is_after_gap() {
         let queue = EncodedFrameQueue::new(Some(2));
-        let gaps = Mutex::new(GapTracker::default());
+        let gaps = Mutex::new(GapTracker::new(true));
         for (sequence, key) in [(0, true), (1, false), (2, false)] {
-            admit(&queue, &gaps, 1, sequence, key, |verdict| (sequence, verdict));
+            admit(&queue, &gaps, 1, sequence, key, |verdict, _| (sequence, verdict));
         }
         // Frame 2 flushed 0 and 1, which it references: it must be flagged and
         // must request the keyframe itself, not leave it to a later frame.
         assert_eq!(drain(&queue), [(2, GAP_REQUEST)]);
-        admit(&queue, &gaps, 1, 3, false, |verdict| (3, verdict));
+        admit(&queue, &gaps, 1, 3, false, |verdict, _| (3, verdict));
         assert_eq!(drain(&queue), [(3, GAP_HELD)]);
     }
 
     #[test]
     fn keyframe_that_flushes_the_backlog_is_intact() {
         let queue = EncodedFrameQueue::new(Some(2));
-        let gaps = Mutex::new(GapTracker::default());
+        let gaps = Mutex::new(GapTracker::new(true));
         for (sequence, key) in [(0, true), (1, false), (2, true), (3, false)] {
-            admit(&queue, &gaps, 1, sequence, key, |verdict| (sequence, verdict));
+            admit(&queue, &gaps, 1, sequence, key, |verdict, _| (sequence, verdict));
         }
         assert_eq!(drain(&queue), [(2, OK), (3, OK)]);
     }
 
     #[test]
     fn flushed_backlog_breaks_the_chain() {
-        let mut t = GapTracker::default();
+        let mut t = GapTracker::new(true);
         assert_eq!(t.observe(1, 0, true, false), OK);
         assert_eq!(t.observe(1, 1, false, true), GAP_REQUEST);
         assert_eq!(t.observe(1, 2, false, false), GAP_HELD);
         assert_eq!(t.observe(1, 3, true, false), OK);
+    }
+
+    #[test]
+    fn a_reader_that_asks_itself_gets_no_request_for_a_flush() {
+        let queue = EncodedFrameQueue::new(Some(2));
+        let gaps = Mutex::new(GapTracker::new(false));
+        for (sequence, key) in [(0, true), (1, false), (2, false), (3, false)] {
+            admit(&queue, &gaps, 1, sequence, key, |verdict, flushed| (sequence, verdict, flushed));
+        }
+        // Frame 2 flushed 0 and 1: marked, and left to the reader to ask.
+        assert_eq!(drain(&queue), [(2, GAP_HELD, true), (3, GAP_HELD, false)]);
+        let mut t = gaps.lock();
+        assert_eq!(t.observe(1, 4, true, false), OK);
+        // A gap in what arrives still asks.
+        assert_eq!(t.observe(1, 6, false, false), GAP_REQUEST);
     }
 }
 

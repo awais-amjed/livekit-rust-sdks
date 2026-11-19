@@ -170,6 +170,18 @@ needs. Everything else is upstream, unchanged.
     writes each rate to it as it is set, and hands the last rate to a source
     whose frames it starts to get (Nov 19 2026).
 
+15. **`libwebrtc`: a reader can ask for the keyframe after a flushed backlog
+    itself.** A reader that falls `max_pending_frames` behind loses the
+    backlog, and the stream asked for a keyframe at once. A share is one
+    stream, so that keyframe went to every viewer, and a viewer whose GPU
+    could not keep up fell behind again and asked again, every few seconds
+    (a review of a game share, Nov 18 2026). With
+    `NativeEncodedVideoStreamOptions::reader_asks_after_flush` the stream
+    leaves the asking to the reader, and marks the frame that flushed
+    (`ReceivedEncodedFrame::after_flush`), so Rift can ask less often while
+    its decoder keeps falling behind. A gap in what arrives still asks at
+    once (Nov 19 2026).
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was
