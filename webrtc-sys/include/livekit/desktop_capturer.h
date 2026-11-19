@@ -66,6 +66,14 @@ class DesktopFrame {
 
   const uint8_t* data() const { return frame->data(); }
 
+  // RIFT PATCH: nothing changed since the capturer's last frame. Only some
+  // capturers mark what changed: DXGI's, for one, hands over its last picture
+  // on every call whether or not the screen drew a new one.
+  bool unchanged() const { return frame->updated_region().is_empty(); }
+
+  // RIFT PATCH: which capturer made it (`webrtc::DesktopCapturerId`).
+  uint32_t capturer_id() const { return frame->capturer_id(); }
+
  private:
   std::unique_ptr<webrtc::DesktopFrame> frame;
 };

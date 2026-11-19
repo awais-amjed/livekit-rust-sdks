@@ -181,6 +181,13 @@ needs. Everything else is upstream, unchanged.
     (`ReceivedEncodedFrame::after_flush`), so Rift can ask less often while
     its decoder keeps falling behind. A gap in what arrives still asks at
     once (Nov 19 2026).
+16. **`webrtc-sys`, `libwebrtc`: a captured frame says whether it changed,
+    and which capturer made it** (`DesktopFrame::unchanged`,
+    `DesktopFrame::capturer_id`, `CAPTURER_WIN_DXGI`). Windows 10's screen
+    capturer (DXGI) hands over its last picture on every call whether or not
+    the screen drew a new one, and Rift converted and encoded each, 60 a
+    second of a still desktop (a review of the Windows 10 share path, Nov 18
+    2026). Rift now leaves out the ones DXGI marks unchanged (Nov 19 2026).
 
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more

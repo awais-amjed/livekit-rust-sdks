@@ -68,6 +68,9 @@ pub mod ffi {
         fn left(self: &DesktopFrame) -> i32;
         fn top(self: &DesktopFrame) -> i32;
         fn data(self: &DesktopFrame) -> *const u8;
+        // RIFT PATCH: see unchanged and capturer_id in desktop_capturer.h.
+        fn unchanged(self: &DesktopFrame) -> bool;
+        fn capturer_id(self: &DesktopFrame) -> u32;
     }
 
     extern "Rust" {

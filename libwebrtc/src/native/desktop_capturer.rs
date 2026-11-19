@@ -211,6 +211,15 @@ impl DesktopFrame {
         let data = self.sys_handle.data();
         unsafe { std::slice::from_raw_parts(data, self.stride() as usize * self.height() as usize) }
     }
+
+    // RIFT PATCH: see DesktopFrame::unchanged.
+    pub(crate) fn unchanged(&self) -> bool {
+        self.sys_handle.unchanged()
+    }
+
+    pub(crate) fn capturer_id(&self) -> u32 {
+        self.sys_handle.capturer_id()
+    }
 }
 
 struct DesktopCallback<T: FnMut(Result<DesktopFrame, CaptureError>) + Send> {

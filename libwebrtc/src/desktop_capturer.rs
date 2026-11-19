@@ -210,7 +210,26 @@ impl DesktopFrame {
     pub fn data(&self) -> &[u8] {
         self.sys_handle.data()
     }
+
+    /// RIFT PATCH: the capturer marked nothing as changed since its last
+    /// frame. Only some capturers mark what changed (Windows' DXGI capturer
+    /// does), so a frame from one that does not may say nothing changed when
+    /// something did: ask [`capturer_id`](Self::capturer_id) first.
+    pub fn unchanged(&self) -> bool {
+        self.sys_handle.unchanged()
+    }
+
+    /// RIFT PATCH: which capturer made the frame, as libwebrtc's
+    /// `DesktopCapturerId` names it: a four-character code, such as
+    /// [`CAPTURER_WIN_DXGI`].
+    pub fn capturer_id(&self) -> u32 {
+        self.sys_handle.capturer_id()
+    }
 }
+
+/// RIFT PATCH: libwebrtc's id for Windows' DXGI screen capturer
+/// (`DesktopCapturerId::kScreenCapturerWinDirectx`).
+pub const CAPTURER_WIN_DXGI: u32 = u32::from_le_bytes(*b"DXGI");
 
 #[derive(Clone)]
 pub struct CaptureSource {
