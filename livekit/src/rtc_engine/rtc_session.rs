@@ -2648,7 +2648,7 @@ impl SessionInner {
 
             if let Err(err) = self.publisher_pc.create_and_send_offer(OfferOptions::default()).await
             {
-                log::error!("failed to negotiate the publisher: {:?}", err);
+                self.log_negotiation_failure(&err);
                 self.negotiation_queue.waiting_for_answer.store(false, Ordering::Release);
             } else {
                 log::debug!("offer sent, waiting for answer...");
@@ -2696,9 +2696,21 @@ impl SessionInner {
                 if let Err(err) =
                     session.publisher_pc.create_and_send_offer(OfferOptions::default()).await
                 {
-                    log::error!("failed to negotiate the publisher: {:?}", err);
+                    session.log_negotiation_failure(&err);
                 }
             }));
+        }
+    }
+
+    // RIFT PATCH: an offer cut off by `close` is expected, not an error. A
+    // room's close unpublishes its tracks first, each queueing an offer, and
+    // the connection closes under it: "Called in wrong state: closed" on most
+    // stops of a share (Rift, on Windows and Linux, Nov 19 2026).
+    fn log_negotiation_failure(&self, err: &EngineError) {
+        if self.closed.load(Ordering::Acquire) {
+            log::debug!("publisher negotiation ended by the close: {:?}", err);
+        } else {
+            log::error!("failed to negotiate the publisher: {:?}", err);
         }
     }
 

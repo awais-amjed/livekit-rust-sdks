@@ -202,6 +202,15 @@ needs. Everything else is upstream, unchanged.
     Not on a paused track's lone picture: the probe is held to twice what the
     tracks send only while they send, and went to the 100 Mbps ceiling.
 
+18. **`livekit`: a publisher offer cut off by the room's close is not an
+    error.** `Room::close` unpublishes each local track, and each queues an
+    offer; the connection then closes under it, and libwebrtc refuses the offer
+    ("Called in wrong state: closed"). The session logged that as an error on
+    most stops of a Rift share: 3 of 4 on Linux, 5 of 8 on Windows. Once the
+    session is closed such a failure is logged at debug level; before, it is
+    still an error. Verified Nov 19 2026 with Rift's
+    `live_gpu_screen_share_rate_climb` on Linux: no error in 6 stops.
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was
