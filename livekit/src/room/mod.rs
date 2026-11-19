@@ -17,7 +17,7 @@ use bmrng::unbounded::UnboundedRequestReceiver;
 use futures_util::StreamExt;
 use libwebrtc::{
     native::frame_cryptor::EncryptionState,
-    prelude::{MediaStream, MediaStreamTrack, RtcConfiguration},
+    prelude::{BitrateSettings, MediaStream, MediaStreamTrack, RtcConfiguration},
     rtp_transceiver::RtpTransceiver,
     RtcError,
 };
@@ -934,6 +934,32 @@ impl Room {
 
     pub async fn get_stats(&self) -> EngineResult<SessionStats> {
         self.inner.rtc_engine.get_stats().await
+    }
+
+    /// RIFT PATCH: ask the publishing connection to probe its path once, up
+    /// to twice what its tracks may send.
+    ///
+    /// libwebrtc's first probes go out when the connection is made, and only
+    /// with media: a publisher that sends nothing for its first seconds (a
+    /// share of a minimised window) loses them and then climbs from its start
+    /// rate at about 8% a second while it sends all it is allowed, which
+    /// never probes either. libwebrtc probes when the connection's ceiling
+    /// rises, so this lowers it by one and puts it back. Needs the ceiling
+    /// `RtcConfiguration::max_bitrate_bps`; without one it does nothing. Call
+    /// it while media is going out, or the probe waits for media and may be
+    /// dropped before any comes.
+    pub fn probe_publisher(&self) -> RoomResult<()> {
+        let Some(max) = self.inner.options.rtc_config.max_bitrate_bps.filter(|&max| max > 1) else {
+            return Ok(());
+        };
+        let connection = self.inner.rtc_engine.session().publisher().peer_connection();
+        let ceiling = |bps: u32| BitrateSettings {
+            max_bitrate_bps: Some(u64::from(bps)),
+            ..Default::default()
+        };
+        connection.set_bitrate(ceiling(max - 1))?;
+        connection.set_bitrate(ceiling(max))?;
+        Ok(())
     }
 
     pub fn subscribe(&self) -> mpsc::UnboundedReceiver<RoomEvent> {

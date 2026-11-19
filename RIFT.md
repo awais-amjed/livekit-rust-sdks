@@ -189,6 +189,19 @@ needs. Everything else is upstream, unchanged.
     second of a still desktop (a review of the Windows 10 share path, Nov 18
     2026). Rift now leaves out the ones DXGI marks unchanged (Nov 19 2026).
 
+17. **`livekit`: a room can ask its publishing connection to probe**
+    (`Room::probe_publisher`). libwebrtc's first probes go out only with
+    media, so a publisher whose first frames came late lost them and climbed
+    from its start rate at about 8% a second: a 12 Mbps share sending nothing
+    for 10 s reached its cap 8–10 s after its pictures began. libwebrtc probes
+    when a connection's ceiling rises, up to twice what its tracks may send,
+    so this lowers the ceiling (item 13) by one and puts it back; with no
+    ceiling it does nothing. Called once pictures flow, the same share had its
+    cap within 2 s (Rift's `climb_live_test`, local server, Nov 19 2026), and
+    a Windows 10 share its 17 Mbps cap a second after its first viewer came.
+    Not on a paused track's lone picture: the probe is held to twice what the
+    tracks send only while they send, and went to the 100 Mbps ceiling.
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was
