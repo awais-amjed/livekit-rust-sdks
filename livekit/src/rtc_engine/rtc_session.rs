@@ -2085,9 +2085,17 @@ impl SessionInner {
             let mut matched = Vec::new();
             let mut partial_matched = Vec::new();
             let mut producible_codecs = Vec::new();
+            let mut rtx = None;
 
             for codec in pc_factory.get_rtp_sender_capabilities(MediaType::Video).codecs {
                 let mime_type = codec.mime_type.to_lowercase();
+                // RIFT PATCH: keep RTX (item 19). Without it the offer has no
+                // resend stream, and libwebrtc sends its padding and probes
+                // on the media stream itself.
+                if mime_type == "video/rtx" {
+                    rtx.get_or_insert(codec);
+                    continue;
+                }
                 if mime_type == requested_mime_type {
                     // RIFT PATCH: High alone when asked for (h264_high). The
                     // server answers in its own order, constrained baseline
@@ -2124,6 +2132,9 @@ impl SessionInner {
                 );
                 high = producible_codecs;
             }
+            // libwebrtc keeps, of the RTX it supports, the RTX of each codec
+            // kept here.
+            high.extend(rtx);
 
             transceiver.set_codec_preferences(high)?;
         }

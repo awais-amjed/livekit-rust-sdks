@@ -211,6 +211,23 @@ needs. Everything else is upstream, unchanged.
     still an error. Verified Nov 19 2026 with Rift's
     `live_gpu_screen_share_rate_climb` on Linux: no error in 6 stops.
 
+19. **`livekit`: a published video track offers RTX.** The codec list the
+    session hands `set_codec_preferences` kept only the chosen codec, so the
+    offer had no `rtx` and the track no resend stream. libwebrtc then sends
+    its padding and bandwidth probes on the media stream itself, as
+    padding-only packets. The server drops these when they arrive in order and
+    forwards them, emptied, when they arrive late; a viewer's H265 packet
+    buffer (`H26xPacketBuffer::InsertPadding`) takes enough late ones to lose
+    track of the stream and assembles nothing until the next keyframe, about
+    3 s. Seen as freezes every few seconds on a friend's H265 share over a
+    line that reorders packets; JavaScript's SDK keeps every codec and was
+    never affected. The list now ends with RTX, and libwebrtc keeps the RTX
+    of the codec chosen. Verified Nov 24 2026 with Rift's
+    `live_gpu_watch_h265_recorded_stream` over a sender that delivers 30% of
+    its packets up to 3 places late: 10 s with no picture in 60 before, none
+    after, the padding on the resend stream and no emptied packets reaching
+    the viewer. Upstream still drops RTX at the time of writing.
+
 The branch on 0.9.1 also changed `webrtc-sys` so WebRTC trusts the
 pass-through encoder's rate control. 0.3.49 does that itself and more
 ([#1511](https://github.com/livekit/rust-sdks/pull/1511)), so that change was
