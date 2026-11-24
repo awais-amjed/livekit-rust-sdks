@@ -2068,7 +2068,7 @@ impl SessionInner {
             transceiver.sender().set_video_encoder_backend(options.video_encoder);
 
             // LocalParticipant already settled on a codec this sender can
-            // produce. Offer only that codec, and never fall back to an empty
+            // produce. Offer only that codec (with its RTX), and never fall back to an empty
             // preference list: libwebrtc would then offer every codec the
             // encoder factory lists, including pass-through-only codecs a raw
             // sender cannot encode.
@@ -2132,9 +2132,11 @@ impl SessionInner {
                 );
                 high = producible_codecs;
             }
-            // libwebrtc keeps, of the RTX it supports, the RTX of each codec
-            // kept here.
-            high.extend(rtx);
+            // RIFT PATCH: libwebrtc keeps, of the RTX it supports, the RTX of
+            // each codec kept here (item 19). Never RTX alone, which it refuses.
+            if !high.is_empty() {
+                high.extend(rtx);
+            }
 
             transceiver.set_codec_preferences(high)?;
         }
